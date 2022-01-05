@@ -1,14 +1,14 @@
-public type BinaryenIntType "i64"|"i32"|"i16"|"i8"|"i1";
+public type IntType "i64"|"i32";
 
-public type BinaryenType "None"|BinaryenIntType;
+public type Type "None"|IntType;
 
-class BinaryenModule {
+class Module {
 
-    function addFunctionImport(string internalName, string externalModuleName, string externalBaseName, BinaryenType params, BinaryenType results) {
+    function addFunctionImport(string internalName, string externalModuleName, string externalBaseName, Type params, Type results) {
         panic error("unimplemented");
     }
 
-    function localGet(int index, BinaryenType ty) returns BinaryenExpression {
+    function localGet(int index, Type ty) returns Expression {
         panic error("unimplemented");
     }
 
@@ -16,7 +16,7 @@ class BinaryenModule {
         panic error("unimplemented");
     }
 
-    function addFunction(string name, BinaryenType params, BinaryenType results, BinaryenType[] varTypes, int numVarTypes, BinaryenExpression body) {
+    function addFunction(string name, Type params, Type results, Type[] varTypes, int numVarTypes, Expression body) {
         panic error("unimplemented");
     }
 
@@ -31,26 +31,26 @@ class BinaryenModule {
 
 
 
-class BinaryenExpression {
+class Expression {
 
 }
 
-function makeConst(BinaryenExpression expr) returns BinaryenExpression {
+function makeConst(Expression expr) returns Expression {
     panic error("unimplemented");
 }
 
-function makeLiteralInt32(int value) returns BinaryenExpression {
+function makeLiteralInt32(int value) returns Expression {
     panic error("unimplemented");
 }
 
-function makeNop() returns BinaryenExpression {
+function makeNop() returns Expression {
     panic error("unimplemented");
 }
 
-function makeReturn(BinaryenExpression? exp = ()) returns BinaryenExpression {
+function makeReturn(Expression? exp = ()) returns Expression {
     panic error("unimplemented");
 }
 
-function makeCall(string name, BinaryenExpression[] operands, int numOperands, BinaryenType returnVal) returns BinaryenExpression {
+function makeCall(string name, Expression[] operands, int numOperands, Type returnVal) returns Expression {
     panic error("unimplemented");
 }

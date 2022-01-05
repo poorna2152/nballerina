@@ -1,29 +1,32 @@
-public function main() returns error? {
+import ballerina/test;
+@test:Config{}
+l
+public function printBoolean() returns error? {
 
-    BinaryenModule module = new;
+    Module module = new;
 
-    BinaryenType[] localTypes = ["i32"];
+    Type[] localTypes = ["i32"];
 
     module.addFunctionImport("println", "console", "log", "i32", "None");
 
 
     // Get the arguement b
-    BinaryenExpression b = module.localGet(0, "i32");
+    Expression b = module.localGet(0, "i32");
 
     // Then call (b == true)
-    BinaryenExpression[] thencallOperands = [makeConst(makeLiteralInt32(1))];
-    BinaryenExpression thenCall = makeCall("println", thencallOperands, 1, "None");
+    Expression[] thencallOperands = [makeConst(makeLiteralInt32(1))];
+    Expression thenCall = makeCall("println", thencallOperands, 1, "None");
 
     // Else call (b == false)
-    BinaryenExpression[] elsecallOperands = [makeConst(makeLiteralInt32(0))];
-    BinaryenExpression elseCall = makeCall("println", elsecallOperands, 1, "None");
+    Expression[] elsecallOperands = [makeConst(makeLiteralInt32(0))];
+    Expression elseCall = makeCall("println", elsecallOperands, 1, "None");
 
   
     Relooper relooper = new(module);
-    RelooperBlock bb0 = relooper.addBlock(makeNop());
-    RelooperBlock bb1 = relooper.addBlock(thenCall);
-    RelooperBlock bb2 = relooper.addBlock(elseCall);
-    RelooperBlock bb3 = relooper.addBlock(makeReturn());
+    Block bb0 = relooper.addBlock(makeNop());
+    Block bb1 = relooper.addBlock(thenCall);
+    Block bb2 = relooper.addBlock(elseCall);
+    Block bb3 = relooper.addBlock(makeReturn());
 
 
     relooper.addBranch(bb1, bb3);
@@ -31,7 +34,7 @@ public function main() returns error? {
     relooper.addBranch(bb0, bb2, b);
     relooper.addBranch(bb0, bb1);
 
-    BinaryenExpression body = relooper.renderAndDispose(bb0, 0);
+    Expression body = relooper.renderAndDispose(bb0, 0);
     
     module.addFunction("printBoolean", "i32", "None", [], 0, body);
     module.addFunctionExport("printBoolean", "printBoolean");

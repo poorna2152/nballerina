@@ -1,26 +1,26 @@
 class Relooper {
 
-    private BinaryenModule module;
+    private Module module;
 
-    function init(BinaryenModule module) {
+    function init(Module module) {
         self.module  = module;
     }
 
-    function addBranch(RelooperBlock fromB, RelooperBlock to, BinaryenExpression? condition = ()) {
+    function addBranch(Block fromB, Block to, Expression? condition = ()) {
         panic error("unimplemented");
     }
 
-    function addBlock(BinaryenExpression code) returns RelooperBlock {
+    function addBlock(Expression code) returns Block {
         panic error("unimplemented");
     }
 
-    function renderAndDispose(RelooperBlock body, int labelHelper) returns BinaryenExpression {
+    function renderAndDispose(Block body, int labelHelper) returns Expression {
         panic error("unimplemented");
     }
 
 }
 
 
-class RelooperBlock {
+class Block {
 
 }
