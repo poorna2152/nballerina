@@ -289,7 +289,94 @@ class Relooper {
     }
 
     function renderSimpleShape(SimpleShape simple) returns Expression[] {
-        panic error("unimplemented");
+        Expression[] children = [];
+        WASMBlock innerBlock = {};
+        WASMBlock nextBlock = {};
+        children.push(innerBlock);
+        if simple.next != () {
+            WASMBlock simpleInnerBlock = {
+                body: [simple.inner.code]
+            };
+            innerBlock.body.push(simpleInnerBlock);
+            if (<Shape>simple.next).ty == "Multiple" {
+                MultipleShape multiple = <MultipleShape>simple.next;
+                string label =  "$block$" + self.shapeId.toString() + "$break";
+                self.shapeId += 1;
+                innerBlock.name = label;
+                simple.next = multiple.next;
+                Expression condition;
+                IfExpr ifExpr = {
+                    label: label
+                };
+                boolean isCond = false;
+                foreach BlockBranchMap blockBranch in simple.inner.branchesOut {
+                    if blockBranch.branch.condition != () {
+                        condition = <Expression>blockBranch.branch.condition;
+                        ifExpr.condition = condition;
+                        isCond = true;
+                    }
+                    if isCond {
+                        Expression[] ifCode = self.renderShape(<Shape>multiple.handledBlocks[blockBranch.block.id.toString()]);
+                        WASMBlock ifBlock = {};
+                        WASMBlock ifBreakBlock = {
+                            body: [<Break>{ label : label }]
+                        };
+                        if ifCode.length() == 1 {
+                            foreach Expression expr in (<WASMBlock>ifCode[0]).body {
+                                ifBlock.body.push(expr);
+                            }                            
+                        }
+                        else {
+                            ifBlock.name = label;
+                            foreach Expression expr in ifCode {
+                               ifBlock.body.push(expr);                            
+                            }
+                        }
+                        ifBlock.body.push(ifBreakBlock);
+                        ifExpr.ifBody = ifBlock;
+                        isCond = false;
+                    }
+                    else {
+                        WASMBlock elseBlock = {};
+                        if multiple.handledBlocks.keys().length() == 2 {
+                            Expression[] elseCode = self.renderShape(<Shape>multiple.handledBlocks[blockBranch.block.id.toString()]);
+                            foreach Expression expr in elseCode {
+                                elseBlock.body.push(expr);                            
+                            }
+                            WASMBlock elseBreak = {
+                                body: [<Break>{ label : label }]
+                            };
+                            elseBlock.body.push(elseBreak);
+                        }
+                        else {
+                            elseBlock.body.push(<Break>{ label : label });
+                        }
+                        ifExpr.elseBody = elseBlock;
+                    }
+                }
+                innerBlock.body.push(ifExpr);
+            }
+            else {
+                io:println("unimplemented");
+            }
+            if simple.next != () {
+                Expression[] nextExprs = self.renderShape(<Shape>simple.next);
+                if nextExprs.length() == 1 {
+                    children.push(nextExprs[0]);
+                }
+                else{
+                    foreach Expression expr in  nextExprs{
+                        nextBlock.body.push(expr);
+                    }
+                    children.push(nextBlock);
+                }
+            }
+            
+        }
+        else {
+            innerBlock.body.push(simple.inner.code);
+        }
+        return children;
     }
 
     function renderLoopShape(LoopShape loop) returns Expression[] {
