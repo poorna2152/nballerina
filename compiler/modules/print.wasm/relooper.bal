@@ -276,6 +276,31 @@ class Relooper {
         }
     }
 
+    function renderShape(Shape sh) returns Expression[] {
+        if sh.ty == "Simple" {
+            return self.renderSimpleShape(<SimpleShape>sh);
+        }
+        else if sh.ty == "Multiple" {
+            return self.renderMultipleShape(<MultipleShape>sh);
+        }
+        else {
+            return self.renderLoopShape(<LoopShape>sh);
+        }
+    }
+
+    function renderSimpleShape(SimpleShape simple) returns Expression[] {
+        panic error("unimplemented");
+    }
+
+    function renderLoopShape(LoopShape loop) returns Expression[] {
+        panic error("unimplemented");
+
+    }
+
+    function renderMultipleShape(MultipleShape multiple) returns Expression[] {
+        panic error("unimplemented");
+    }
+
     function render(Block body, int labelHelper) returns Expression {
         self.root = self.calculate(self.blocks, [body]);
         // TODO:mapping between relooper blocks and WASM blocks
