@@ -388,10 +388,54 @@ class Relooper {
         panic error("unimplemented");
     }
 
+    function printSpaces(int spaceCount) returns string {
+        string spaces = "";
+        foreach int i in 0...spaceCount {
+            spaces += " ";
+        }
+        return spaces;
+    }
+
+    function makeBlockText(Expression[] result, int spacesCount) returns string {
+        Expression curr;
+        string currStr = "";
+        while result.length() > 0 {
+            curr = result.remove(0);
+            if curr.ty == "Block" {
+                if (<WASMBlock>curr).name != () {
+                    currStr += self.printSpaces(spacesCount) + "(block " + <string>(<WASMBlock>curr).name + "\n";
+                }
+                else {
+                    currStr += self.printSpaces(spacesCount) + "(block" + "\n";
+                }
+                foreach Expression expr in (<WASMBlock>curr).body {
+                    currStr += self.makeBlockText([expr], spacesCount + 1);
+                }
+                currStr += self.printSpaces(spacesCount) + ")\n";
+            }
+            else if curr.ty == "If" {
+                IfExpr ifExpr = <IfExpr>curr;
+                currStr += self.printSpaces(spacesCount) + "(if\n";
+                Expression cond = <Expression>(ifExpr.condition);
+                currStr += self.printSpaces(spacesCount + 1) + <string>cond.code + "\n";
+                currStr += self.makeBlockText([<WASMBlock>ifExpr.ifBody], spacesCount + 1);
+                currStr += self.makeBlockText([<WASMBlock>ifExpr.elseBody], spacesCount + 1);
+                currStr += self.printSpaces(spacesCount) + ")\n";
+            }
+            else if curr.ty == "Break" {
+                currStr += self.printSpaces(spacesCount) + "(br " + <string>(<Break>curr).label + ")\n";
+            }
+            else {
+                currStr += self.printSpaces(spacesCount) + <string>curr.code + "\n";
+            }
+        }
+        return currStr;
+    }
+
     function render(Block body, int labelHelper) returns Expression {
         self.root = self.calculate(self.blocks, [body]);
-        // TODO:mapping between relooper blocks and WASM blocks
-        return {code: "Hello World"};    
+        Expression[] result = self.renderShape(<Shape>self.root);
+        return {code: self.makeBlockText(result, 1)};
     }
 
 }
