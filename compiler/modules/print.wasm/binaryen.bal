@@ -94,7 +94,20 @@ class Module {
 
     // BinaryenModuleDispose and BinaryenModulePrint
     function finish(){
-        panic error("unimplemented");
+        io:println("(module");
+        foreach string imp in self.imports {
+            io:println(" "+ imp);
+        }
+        foreach string exp in self.exports {
+            io:println(" "+ exp);
+        }
+        foreach string func in self.functions {
+            int spaceCount = 2;
+            boolean skip = true;
+            io:print(" ");
+            io:print(func);   
+        }
+        io:println(")");
     }
                                             
 }
