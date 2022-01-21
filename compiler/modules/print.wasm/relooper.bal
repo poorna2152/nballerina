@@ -173,7 +173,7 @@ class Relooper {
                             independentGroups[owner.id.toString()] = group;
                         }
                         else {
-                            Block? existingOwner = ownership[index.toString()];
+                            Block? existingOwner = ownership[child.block.id.toString()];
                             if existingOwner == () {
                                 continue;
                             }
