@@ -11,6 +11,29 @@ type Export record {
 
 type Expression record {
     string? code = ();
+    string ty = "Base";
+};
+
+type WASMBlock record {
+    string ty = "Block";
+    Expression[] body = [];
+    string? name = ();
+    string? code = ();
+};
+
+type IfExpr record  {
+    string ty = "If";
+    Expression? condition = ();
+    WASMBlock? elseBody = ();
+    WASMBlock? ifBody = ();
+    string? code = ();
+    string? label = ();
+};
+
+type Break record {
+    string ty = "Break";
+    string? code = ();
+    string? label = ();
 };
 
 type LiteralInt32 record {
