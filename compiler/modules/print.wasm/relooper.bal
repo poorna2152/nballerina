@@ -82,8 +82,8 @@ class Relooper {
         foreach BlockBranchMap next in entry.branchesOut {
             if self.checkExistence(blocks, next.block.id) {
                 nextEntries.push(next.block);
-                next.block.branchesIn = next.block.branchesIn.filter(b => b.id != entry.id);
             }
+            next.block.branchesIn = next.block.branchesIn.filter(b => b.id != entry.id);
         }
         Block[] validBlocks = blocks.filter(b => b.id != entry.id);
         SimpleShape simple = {
@@ -153,7 +153,6 @@ class Relooper {
             independentGroups[entry.id.toString()] = [entry];
         }
         Block[] queue = entries.clone();
-
         while queue.length() > 0 {
             Block curr = queue.remove(0);
             int? index = ownership.keys().indexOf(curr.id.toString());
@@ -227,7 +226,7 @@ class Relooper {
                 foreach Block currInner in group {
                     validBlocks = validBlocks.filter(b => b.id != currInner.id);
                     foreach BlockBranchMap item in currInner.branchesOut {
-                        if self.checkExistence(group, item.block.id) {
+                        if !self.checkExistence(group, item.block.id) {
                             Block curr = item.block;
                             foreach Block prev in curr.branchesIn {
                                 index = entries.indexOf(prev);
@@ -235,7 +234,8 @@ class Relooper {
                                     curr.branchesIn = curr.branchesIn.filter(b => b.id != prev.id);
                                 }
                             }
-                            if self.checkExistence(nextEntries, item.block.id) {
+                            if !self.checkExistence(nextEntries, item.block.id) {
+                                curr.branchesIn = curr.branchesIn.filter(prev => !self.checkExistence(group, prev.id));
                                 nextEntries.push(curr);
                             }
                         }
@@ -251,7 +251,13 @@ class Relooper {
     function calculate(Block[] validBlocks, Block[] entries) returns Shape? {
         if entries.length() == 1 {
             Block entry = entries[0];
-            if entry.branchesIn.length() == 0 {
+            int inCount = 0;
+            foreach Block prev in entry.branchesIn {
+                if self.checkExistence(validBlocks, prev.id) {
+                    inCount += 1;
+                }
+            }
+            if inCount == 0 {
                 return self.createSimpleShape(validBlocks,entry);
             }
             else {
