@@ -68,10 +68,19 @@ class Relooper {
         return block;
     }
 
+    function checkExistence(Block[] blocks, int id) returns boolean {
+        foreach Block b in blocks {
+            if b.id == id {
+                return true;
+            }
+        }
+        return false;
+    } 
+
     function createSimpleShape(Block[] blocks, Block entry) returns Shape {
         Block[] nextEntries = [];
         foreach BlockBranchMap next in entry.branchesOut {
-            if blocks.indexOf(next.block) != () {
+            if self.checkExistence(blocks, next.block.id) {
                 nextEntries.push(next.block);
                 next.block.branchesIn = next.block.branchesIn.filter(b => b.id != entry.id);
             }
@@ -218,13 +227,16 @@ class Relooper {
                 foreach Block currInner in group {
                     validBlocks = validBlocks.filter(b => b.id != currInner.id);
                     foreach BlockBranchMap item in currInner.branchesOut {
-                        if group.indexOf(item.block) == () && nextEntries.indexOf(item.block) == () {
-                            nextEntries.push(item.block);
-                            foreach Block prev in item.block.branchesIn {
+                        if self.checkExistence(group, item.block.id) {
+                            Block curr = item.block;
+                            foreach Block prev in curr.branchesIn {
                                 index = entries.indexOf(prev);
                                 if index != () {
-                                    item.block.branchesIn = item.block.branchesIn.filter(b => b.id != prev.id);
+                                    curr.branchesIn = curr.branchesIn.filter(b => b.id != prev.id);
                                 }
+                            }
+                            if self.checkExistence(nextEntries, item.block.id) {
+                                nextEntries.push(curr);
                             }
                         }
                     }
