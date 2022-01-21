@@ -40,7 +40,8 @@ class Relooper {
     private Block[] blocks = [];
     private int blockId = 1;
     private Block[] entries =[];
-    private Block root = ();
+    private Shape? root = ();
+    private int shapeId = 1;
 
     function init(Module module) {
         self.module = module;
