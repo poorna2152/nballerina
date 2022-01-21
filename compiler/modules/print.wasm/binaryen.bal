@@ -10,55 +10,86 @@ type Export record {
 };
 
 type Expression record {
-    
+    string? code = ();
 };
 
 type LiteralInt32 record {
     int i32;
+    string ty = "i32";
 };
 
 type LiteralInt64 record {
     int i64;
+    string ty = "i64";
 };
 
 type Literal LiteralInt32|LiteralInt64;
 
 class Module {
-    private Function[] functions;
-    private map<Function> functionMap;
-    private Export[] exports;
-    private map<Export> exportMap;
+    private string[] functions = [];
+    private string[] imports = [];
+    private string[] exports = [];
 
     function call(string target, Expression[] operands, int numOperands, Type returnType) returns Expression {
-        panic error("unimplemented");
+        string operandsStr = "";
+        foreach int i in 0...numOperands - 1 {
+            if i == numOperands - 1 {
+                operandsStr += <string>operands[i].code;
+            }
+            else {
+                operandsStr += <string>operands[i].code + "\n";
+            }
+        }
+        return { code: "(call $"+ target + operandsStr + ")" };
     }
 
     function localGet(int index, Type ty) returns Expression {
-        panic error("unimplemented");
+        return { code: "(local.get $" + index.toString() + ")" };
     }
     
     function addConst(Literal value) returns Expression {
-        panic error("unimplemented");
+        if value.ty == "i32" {
+            return { code: "(i32.const "+ (<LiteralInt32>value).i32.toString() + ")" };
+        }
+        else {
+            return { code: "(i64.const "+ (<LiteralInt64>value).i64.toString() + ")" };
+        }
     }
 
-    function addReturn(Expression? value= ()) returns Expression {
-        panic error("unimplemented");        
+    function addReturn(Expression? value = ()) returns Expression {
+        if value != () {
+            return { code: "(return " + <string>(<Expression>value).code + ")" };     
+        }
+        return { code: "(return)" };
     }
 
     function nop() returns Expression {
-        panic error("unimplemented");        
+        return { code: "nop" };
     }
          
-    function addFunction(string name, Type[] params, Type results, Type[] varTypes, int numVarTypes, Expression body)  {
-        panic error("unimplemented");        
+    function addFunction(string name, Type[] params, Type results, Type[] varTypes, int numVarTypes, Expression body) {
+        string funcParams = "";
+        foreach int i in 0...numVarTypes - 1 {
+            funcParams += " (param $" + i.toString() + " " + params[i] + ")";
+        }
+        string funcDef = "(func $" + name + funcParams + "\n" + <string>body.code + " )\n";
+        self.functions.push(funcDef);  
     }
 
     function addFunctionImport(string internalName, string externalModuleName, string externalBaseName, Type params, Type results)  {
-        panic error("unimplemented");        
+        string funcDef = "(import \"" + externalModuleName + "\" \"" + externalBaseName + "\" (func $" + internalName + " (param " + params + ")";
+        if results != "None" {
+            funcDef += "(param " + results+ ")))";
+        }
+        else{
+            funcDef += "))";
+        }
+        self.imports.push(funcDef);
     }
 
     function addFunctionExport(string internalName, string externalName) {
-        panic error("unimplemented");        
+        string funcDef = "(export \"" + externalName + "\"" +  " (func $" + internalName + "))";
+        self.exports.push(funcDef);
     }
 
     // BinaryenModuleDispose and BinaryenModulePrint
