@@ -278,24 +278,24 @@ class Relooper {
     }
 
     function renderShape(Shape sh) returns Expression[] {
-        if sh.ty == "Simple" {
-            return self.renderSimpleShape(<SimpleShape>sh);
+        if sh is SimpleShape {
+            return self.renderSimpleShape(sh);
         }
-        else if sh.ty == "Multiple" {
-            return self.renderMultipleShape(<MultipleShape>sh);
+        else if sh is MultipleShape {
+            return self.renderMultipleShape(sh);
         }
         else {
-            return self.renderLoopShape(<LoopShape>sh);
+            return self.renderLoopShape(sh);
         }
     }
 
     function renderSimpleShape(SimpleShape simple) returns Expression[] {
         Expression[] children = [];
-        WASMBlock innerBlock = {};
-        WASMBlock nextBlock = {};
+        Wasmblock innerBlock = {};
+        Wasmblock nextBlock = {};
         children.push(innerBlock);
         if simple.next != () {
-            WASMBlock simpleInnerBlock = {
+            Wasmblock simpleInnerBlock = {
                 body: [simple.inner.code]
             };
             innerBlock.body.push(simpleInnerBlock);
@@ -306,7 +306,7 @@ class Relooper {
                 innerBlock.name = label;
                 simple.next = multiple.next;
                 Expression condition;
-                IfExpr ifExpr = {
+                If ifExpr = {
                     label: label
                 };
                 boolean isCond = false;
@@ -318,12 +318,12 @@ class Relooper {
                     }
                     if isCond {
                         Expression[] ifCode = self.renderShape(<Shape>multiple.handledBlocks[blockBranch.block.id.toString()]);
-                        WASMBlock ifBlock = {};
-                        WASMBlock ifBreakBlock = {
+                        Wasmblock ifBlock = {};
+                        Wasmblock ifBreakBlock = {
                             body: [<Break>{ label : label }]
                         };
                         if ifCode.length() == 1 {
-                            foreach Expression expr in (<WASMBlock>ifCode[0]).body {
+                            foreach Expression expr in (<Wasmblock>ifCode[0]).body {
                                 ifBlock.body.push(expr);
                             }                            
                         }
@@ -338,13 +338,13 @@ class Relooper {
                         isCond = false;
                     }
                     else {
-                        WASMBlock elseBlock = {};
+                        Wasmblock elseBlock = {};
                         if multiple.handledBlocks.keys().length() == 2 {
                             Expression[] elseCode = self.renderShape(<Shape>multiple.handledBlocks[blockBranch.block.id.toString()]);
                             foreach Expression expr in elseCode {
                                 elseBlock.body.push(expr);                            
                             }
-                            WASMBlock elseBreak = {
+                            Wasmblock elseBreak = {
                                 body: [<Break>{ label : label }]
                             };
                             elseBlock.body.push(elseBreak);
@@ -403,24 +403,24 @@ class Relooper {
         while result.length() > 0 {
             curr = result.remove(0);
             if curr.ty == "Block" {
-                if (<WASMBlock>curr).name != () {
-                    currStr += self.printSpaces(spacesCount) + "(block " + <string>(<WASMBlock>curr).name + "\n";
+                if (<Wasmblock>curr).name != () {
+                    currStr += self.printSpaces(spacesCount) + "(block " + <string>(<Wasmblock>curr).name + "\n";
                 }
                 else {
                     currStr += self.printSpaces(spacesCount) + "(block" + "\n";
                 }
-                foreach Expression expr in (<WASMBlock>curr).body {
+                foreach Expression expr in (<Wasmblock>curr).body {
                     currStr += self.makeBlockText([expr], spacesCount + 1);
                 }
                 currStr += self.printSpaces(spacesCount) + ")\n";
             }
             else if curr.ty == "If" {
-                IfExpr ifExpr = <IfExpr>curr;
+                If ifExpr = <If>curr;
                 currStr += self.printSpaces(spacesCount) + "(if\n";
                 Expression cond = <Expression>(ifExpr.condition);
                 currStr += self.printSpaces(spacesCount + 1) + <string>cond.code + "\n";
-                currStr += self.makeBlockText([<WASMBlock>ifExpr.ifBody], spacesCount + 1);
-                currStr += self.makeBlockText([<WASMBlock>ifExpr.elseBody], spacesCount + 1);
+                currStr += self.makeBlockText([<Wasmblock>ifExpr.ifBody], spacesCount + 1);
+                currStr += self.makeBlockText([<Wasmblock>ifExpr.elseBody], spacesCount + 1);
                 currStr += self.printSpaces(spacesCount) + ")\n";
             }
             else if curr.ty == "Break" {

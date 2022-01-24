@@ -2,11 +2,17 @@ public type IntType "i64"|"i32";
 public type Type "None"|IntType;
 
 type Function record {
-
+    Expression[] body;
+    Type[] vars;
+    string name;
+    string module;
+    string base;
 };
 
 type Export record {
-     
+    string value;
+    string name;
+    string kind;
 };
 
 type Expression record {
@@ -14,18 +20,44 @@ type Expression record {
     string ty = "Base";
 };
 
-type WASMBlock record {
+type Call record {
+    Expression[] operands;
+    string target;
+    boolean isReturn = false;
+    Type ty;
+};
+
+type LocalGet record {
+    int index;
+    Type ty;
+};
+
+type Const record {
+    Type ty;
+    Literal value;
+};
+
+type Return record {
+    Type ty;
+    Expression value;
+};
+
+type Nop record {
+
+};
+
+type Wasmblock record {
     string ty = "Block";
     Expression[] body = [];
     string? name = ();
     string? code = ();
 };
 
-type IfExpr record  {
+type If record  {
     string ty = "If";
     Expression? condition = ();
-    WASMBlock? elseBody = ();
-    WASMBlock? ifBody = ();
+    Wasmblock? elseBody = ();
+    Wasmblock? ifBody = ();
     string? code = ();
     string? label = ();
 };
@@ -38,12 +70,10 @@ type Break record {
 
 type LiteralInt32 record {
     int i32;
-    string ty = "i32";
 };
 
 type LiteralInt64 record {
     int i64;
-    string ty = "i64";
 };
 
 type Literal LiteralInt32|LiteralInt64;
@@ -71,11 +101,11 @@ class Module {
     }
     
     function addConst(Literal value) returns Expression {
-        if value.ty == "i32" {
-            return { code: "(i32.const "+ (<LiteralInt32>value).i32.toString() + ")" };
+        if value is LiteralInt32 {
+            return { code: "(i32.const "+ value.i32.toString() + ")" };
         }
         else {
-            return { code: "(i64.const "+ (<LiteralInt64>value).i64.toString() + ")" };
+            return { code: "(i64.const "+ value.i64.toString() + ")" };
         }
     }
 
