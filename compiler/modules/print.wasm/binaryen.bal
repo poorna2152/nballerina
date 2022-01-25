@@ -2,25 +2,26 @@ public type IntType "i64"|"i32";
 public type Type "None"|IntType;
 
 type Function record {
-    Expression[] body;
-    Type[] vars;
+    Expression? body = ();
+    Type[] vars = [];
     string name;
-    string module;
-    string base;
+    string? module = ();
+    string? base = ();
+    Type[] params = [];
+    Type? results = ();
 };
 
 type Export record {
     string value;
     string name;
-    string kind;
 };
 
 type Expression record {
     string? code = ();
-    string ty = "Base";
 };
 
 type Call record {
+    *Expression;
     Expression[] operands;
     string target;
     boolean isReturn = false;
@@ -28,43 +29,41 @@ type Call record {
 };
 
 type LocalGet record {
+    *Expression;
     int index;
     Type ty;
 };
 
 type Const record {
-    Type ty;
+    *Expression;
     Literal value;
 };
 
 type Return record {
-    Type ty;
-    Expression value;
+    *Expression;
+    Expression? value = ();
 };
 
 type Nop record {
-
+    *Expression;
 };
 
-type Wasmblock record {
-    string ty = "Block";
+type WasmBlock record {
+    *Expression;
     Expression[] body = [];
     string? name = ();
-    string? code = ();
 };
 
-type If record  {
-    string ty = "If";
+type If record {
+    *Expression;
     Expression? condition = ();
-    Wasmblock? elseBody = ();
-    Wasmblock? ifBody = ();
-    string? code = ();
+    WasmBlock? elseBody = ();
+    WasmBlock? ifBody = ();
     string? label = ();
 };
 
 type Break record {
-    string ty = "Break";
-    string? code = ();
+    *Expression;
     string? label = ();
 };
 
@@ -79,88 +78,78 @@ type LiteralInt64 record {
 type Literal LiteralInt32|LiteralInt64;
 
 class Module {
-    private string[] functions = [];
-    private string[] imports = [];
-    private string[] exports = [];
+    private Function[] functions = [];
+    private Export[] exports = [];
 
     function call(string target, Expression[] operands, int numOperands, Type returnType) returns Expression {
-        string operandsStr = "";
-        foreach int i in 0...numOperands - 1 {
-            if i == numOperands - 1 {
-                operandsStr += <string>operands[i].code;
-            }
-            else {
-                operandsStr += <string>operands[i].code + "\n";
-            }
-        }
-        return { code: "(call $"+ target + operandsStr + ")" };
+        Call call = {
+            target : target,
+            operands : operands,
+            ty : returnType
+        };
+        return call;
     }
 
     function localGet(int index, Type ty) returns Expression {
-        return { code: "(local.get $" + index.toString() + ")" };
+        LocalGet localGet = {
+            index: index,
+            ty : ty
+        };
+        return localGet;
     }
-    
+
     function addConst(Literal value) returns Expression {
-        if value is LiteralInt32 {
-            return { code: "(i32.const "+ value.i32.toString() + ")" };
-        }
-        else {
-            return { code: "(i64.const "+ value.i64.toString() + ")" };
-        }
+        Const constVal = {
+            value : value
+        };
+        return constVal;
     }
 
     function addReturn(Expression? value = ()) returns Expression {
-        if value != () {
-            return { code: "(return " + <string>(<Expression>value).code + ")" };     
-        }
-        return { code: "(return)" };
+        Return ret = {
+            value : value
+        };
+        return ret;
     }
 
     function nop() returns Expression {
-        return { code: "nop" };
+        Nop nop = {};
+        return nop;
     }
          
     function addFunction(string name, Type[] params, Type results, Type[] varTypes, int numVarTypes, Expression body) {
-        string funcParams = "";
-        foreach int i in 0...numVarTypes - 1 {
-            funcParams += " (param $" + i.toString() + " " + params[i] + ")";
-        }
-        string funcDef = "(func $" + name + funcParams + "\n" + <string>body.code + " )\n";
-        self.functions.push(funcDef);  
+        Function func = {
+            name : name,
+            body : body,
+            params : params,
+            results : results,
+            vars : varTypes 
+        };
+        self.functions.push(func);  
     }
 
-    function addFunctionImport(string internalName, string externalModuleName, string externalBaseName, Type params, Type results)  {
-        string funcDef = "(import \"" + externalModuleName + "\" \"" + externalBaseName + "\" (func $" + internalName + " (param " + params + ")";
-        if results != "None" {
-            funcDef += "(param " + results+ ")))";
-        }
-        else{
-            funcDef += "))";
-        }
-        self.imports.push(funcDef);
+    function addFunctionImport(string internalName, string externalModuleName, string externalBaseName, Type[] params, Type results)  {
+         Function func = {
+            name : internalName,
+            module : externalModuleName,
+            base : externalBaseName,
+            results : results,
+            params : params 
+        };
+        self.functions.push(func);
     }
 
     function addFunctionExport(string internalName, string externalName) {
-        string funcDef = "(export \"" + externalName + "\"" +  " (func $" + internalName + "))";
-        self.exports.push(funcDef);
+        Export exportFunc = {
+            value : internalName,
+            name : externalName
+        };
+        self.exports.push(exportFunc);
     }
 
     // BinaryenModuleDispose and BinaryenModulePrint
     function finish(){
-        io:println("(module");
-        foreach string imp in self.imports {
-            io:println(" "+ imp);
-        }
-        foreach string exp in self.exports {
-            io:println(" "+ exp);
-        }
-        foreach string func in self.functions {
-            int spaceCount = 2;
-            boolean skip = true;
-            io:print(" ");
-            io:print(func);   
-        }
-        io:println(")");
+        panic error("unimplemented");
     }
                                             
 }
