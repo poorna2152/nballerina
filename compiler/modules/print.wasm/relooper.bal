@@ -124,24 +124,18 @@ class Relooper {
         Block[] queue = [block];
         while queue.length() > 0 {
             Block curr = queue.remove(0);
-            int? index = ownership.keys().indexOf(curr.id.toString());
-            if index == () {
+            Block? owner = ownership[curr.id.toString()];
+            if owner == () {
                 continue;
             }
             else {
-                Block? owner = ownership[curr.id.toString()];
-                if owner == () {
-                    continue;
-                }
-                else {
-                    Block[]? ownerGroup = independentGroups[owner.id.toString()];
-                    if ownerGroup != () {
-                        ownerGroup = ownerGroup.filter(b => b.id != curr.id);
-                        independentGroups[owner.id.toString()] = ownerGroup;
-                        ownership[curr.id.toString()] = ();
-                        foreach BlockBranchMap child in curr.branchesOut {
-                            queue.push(child.block);
-                        }
+                Block[]? ownerGroup = independentGroups[owner.id.toString()];
+                if ownerGroup != () {
+                    ownerGroup = ownerGroup.filter(b => b.id != curr.id);
+                    independentGroups[owner.id.toString()] = ownerGroup;
+                    ownership[curr.id.toString()] = ();
+                    foreach BlockBranchMap child in curr.branchesOut {
+                        queue.push(child.block);
                     }
                 }
             }
@@ -426,47 +420,62 @@ class Relooper {
 
     function makeBlockText(Expression[] result, int spacesCount) returns string {
         Expression curr;
-        string currStr = "";
+        string[] currStr = [];
         while result.length() > 0 {
             curr = result.remove(0);
             if curr is WasmBlock {
                 string? name = curr.name;
                 if name != () {
-                    currStr += self.printSpaces(spacesCount) + "(block " + name + "\n";
+                    currStr.push(self.printSpaces(spacesCount));
+                    currStr.push("(block ");
+                    currStr.push(name);
+                    currStr.push("\n");
                 }
                 else {
-                    currStr += self.printSpaces(spacesCount) + "(block" + "\n";
+                    currStr.push(self.printSpaces(spacesCount));
+                    currStr.push("(block");
+                    currStr.push("\n");
                 }
                 foreach Expression expr in curr.body {
-                    currStr += self.makeBlockText([expr], spacesCount + 1);
+                    currStr.push(self.makeBlockText([expr], spacesCount + 1));
                 }
-                currStr += self.printSpaces(spacesCount) + ")\n";
+                currStr.push(self.printSpaces(spacesCount));
+                currStr.push(")\n");
             }
             else if curr is If {
                 If ifExpr = curr;
                 WasmBlock? elseBody = ifExpr.elseBody;
-                currStr += self.printSpaces(spacesCount) + "(if\n";
+                currStr.push(self.printSpaces(spacesCount));
+                currStr.push("(if\n");
                 string? conditionCode = ifExpr.condition.code;
                 if conditionCode != () {
-                    currStr += self.printSpaces(spacesCount + 1) + conditionCode + "\n";
+                    currStr.push(self.printSpaces(spacesCount + 1));
+                    currStr.push(conditionCode);
+                    currStr.push("\n");
                 }
-                currStr += self.makeBlockText([ifExpr.ifBody], spacesCount + 1);
+                currStr.push(self.makeBlockText([ifExpr.ifBody], spacesCount + 1));
                 if elseBody != () {
-                    currStr += self.makeBlockText([elseBody], spacesCount + 1);
+                    currStr.push(self.makeBlockText([elseBody], spacesCount + 1));
                 }
-                currStr += self.printSpaces(spacesCount) + ")\n";
+                currStr.push(self.printSpaces(spacesCount));
+                currStr.push(")\n");
             }
             else if curr is Break {
-                currStr += self.printSpaces(spacesCount) + "(br " + curr.label + ")\n";
+                currStr.push(self.printSpaces(spacesCount));
+                currStr.push("(br ");
+                currStr.push(curr.label);
+                currStr.push(")\n");
             }
             else {
                 string? code = curr.code;
                 if code != () {
-                    currStr += self.printSpaces(spacesCount) + code + "\n";
+                    currStr.push(self.printSpaces(spacesCount));
+                    currStr.push(code);
+                    currStr.push("\n");
                 }
             }
         }
-        return currStr;
+        return "".'join(...currStr);
     }
 
     function render(Block body, int labelHelper) returns Expression {
