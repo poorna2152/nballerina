@@ -56,15 +56,14 @@ type WasmBlock record {
 
 type If record {
     *Expression;
-    Expression? condition = ();
-    WasmBlock? elseBody = ();
-    WasmBlock? ifBody = ();
-    string? label = ();
+    Expression condition;
+    WasmBlock? elseBody;
+    WasmBlock ifBody;
 };
 
 type Break record {
     *Expression;
-    string? label = ();
+    string label;
 };
 
 type LiteralInt32 record {
