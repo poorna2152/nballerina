@@ -89,26 +89,34 @@ class Relooper {
         Block[] validBlocks = blocks.filter(b => b.id != entry.id);
         SimpleShape simple = {
             inner: entry,
-            next: self.calculate(validBlocks,nextEntries)
+            next: self.calculate(validBlocks, nextEntries)
         };
         return simple;
     }
 
     function createLoopShape(Block[] blocks, Block[] entries) returns Shape {
         Block[] nextEntries = [];
-        Block[] innerBlocks = [];
+        Block[] innerBlocks = entries.clone();
         Block[] validBlocks = blocks.clone();
-        foreach Block entry in entries {
-            foreach Block prev in entry.branchesIn {
-                if innerBlocks.indexOf(prev) == () {
+        Block[] queue = entries.clone();
+        while queue.length() > 0 {
+            Block curr = queue.remove(0);
+            foreach Block prev in curr.branchesIn {
+                if !self.checkExistence(innerBlocks, prev.id) {
+                    queue.push(prev);
                     innerBlocks.push(prev);
-                    validBlocks = blocks.filter(b => b.id != prev.id);
+                    validBlocks = validBlocks.filter(b => b.id != prev.id);
                 }
-            }    
+            }
+            validBlocks = validBlocks.filter(b => b.id != curr.id);
+        }
+        foreach Block entry in entries {
+            entry.branchesIn = entry.branchesIn.filter(b => !self.checkExistence(innerBlocks, b.id));
         }
         foreach Block inner in innerBlocks {
             foreach BlockBranchMap block in inner.branchesOut {
-                if innerBlocks.indexOf(block.block) == () {
+                if self.checkExistence(validBlocks, block.block.id) {
+                    block.block.branchesIn = block.block.branchesIn.filter(b => !self.checkExistence(innerBlocks, b.id));
                     nextEntries.push(block.block);
                 }
             }
@@ -120,7 +128,7 @@ class Relooper {
         return loop;
     }
 
-    function invalidateChildren(Block block, map<Block?> ownership, map<Block[]> independentGroups) {
+    function invalidateChildren(Block block, map<Block?> ownership, map<Block[]?> independentGroups) {
         Block[] queue = [block];
         while queue.length() > 0 {
             Block curr = queue.remove(0);
@@ -152,48 +160,41 @@ class Relooper {
         Block[] queue = entries.clone();
         while queue.length() > 0 {
             Block curr = queue.remove(0);
-            int? index = ownership.keys().indexOf(curr.id.toString());
-            if index != () {
-                Block? owner = ownership[curr.id.toString()];
-                if owner == () {
-                    continue;
-                }
-                else {
-                    foreach BlockBranchMap child in curr.branchesOut {
-                        index = ownership.keys().indexOf(child.block.id.toString());
-                        if index == () {
-                            queue.push(child.block);
-                            ownership[child.block.id.toString()] = owner;
-                            Block[]? group = independentGroups[owner.id.toString()];
-                            if group != () {
-                                group.push(child.block);            
-                                independentGroups[owner.id.toString()] = group;
-                            }
-                        }
-                        else {
-                            Block? existingOwner = ownership[child.block.id.toString()];
-                            if existingOwner == () {
-                                continue;
-                            }
-                            else if existingOwner.id != owner.id {
-                                self.invalidateChildren(child.block, ownership, independentGroups);
-                            } 
-                        }
-                    }
-                }
-            }
-            else {
+            Block? owner = ownership[curr.id.toString()];
+            if owner == () {
                 continue;
             }
+            else {
+                foreach BlockBranchMap child in curr.branchesOut {
+                    int? index = ownership.keys().indexOf(child.block.id.toString());
+                    if index == () {
+                        queue.push(child.block);
+                        ownership[child.block.id.toString()] = owner;
+                        Block[]? group = independentGroups[owner.id.toString()];
+                        if group != () {
+                            group.push(child.block);            
+                            independentGroups[owner.id.toString()] = group;
+                        }
+                    }
+                    else {
+                        Block? existingOwner = ownership[child.block.id.toString()];
+                        if existingOwner == () {
+                            continue;
+                        }
+                        else if existingOwner.id != owner.id {
+                            self.invalidateChildren(child.block, ownership, independentGroups);
+                        } 
+                    }
+                }
+            } 
         }
         foreach Block entry in entries {
             Block[]? group = independentGroups[entry.id.toString()];
-            Block[] toInvalidate =[];
             if group != () {
                 foreach Block child in group {
                     foreach Block parent in child.branchesIn {
                         if ownership[parent.id.toString()] != ownership[child.id.toString()] {
-                            self.invalidateChildren(child,ownership,independentGroups);
+                            self.invalidateChildren(child, ownership, independentGroups);
                             break;
                         }
                     }
@@ -204,8 +205,11 @@ class Relooper {
             Block[]? group = independentGroups[entry.id.toString()];
             if group != () {
                 if group.length() == 0 {
-                    Block[] removed = independentGroups.remove(entry.id.toString());
+                    _ = independentGroups.remove(entry.id.toString());
                 }
+            }
+            else {
+                _ = independentGroups.remove(entry.id.toString());
             }
         }
         return independentGroups;
@@ -215,57 +219,39 @@ class Relooper {
         Block[] nextEntries = [];
         Block[] validBlocks = blocks.clone();
         MultipleShape multiple = {};
-        Block[] currEntries = [];
         foreach Block entry in entries {
-            int? index = independentGroups.keys().indexOf(entry.id.toString());
-            if index == () {
+            Block[]? group  = independentGroups[entry.id.toString()];
+            if group == () {
                 nextEntries.push(entry);
             }
             else {
-                currEntries = [];
-                currEntries.push(entry);
                 validBlocks = validBlocks.filter(b => b.id != entry.id);
-                Block[]? group = independentGroups[entry.id.toString()];
-                if group != () {
-                    foreach Block currInner in group {
-                        validBlocks = validBlocks.filter(b => b.id != currInner.id);
-                        foreach BlockBranchMap item in currInner.branchesOut {
-                            if !self.checkExistence(group, item.block.id) {
-                                Block curr = item.block;
-                                foreach Block prev in curr.branchesIn {
-                                    index = entries.indexOf(prev);
-                                    if index != () {
-                                        curr.branchesIn = curr.branchesIn.filter(b => b.id != prev.id);
-                                    }
-                                }
-                                if !self.checkExistence(nextEntries, item.block.id) {
-                                    curr.branchesIn = curr.branchesIn.filter(prev => !self.checkExistence(group, prev.id));
-                                    nextEntries.push(curr);
-                                }
+                foreach Block currInner in group {
+                    validBlocks = validBlocks.filter(b => b.id != currInner.id);
+                    foreach BlockBranchMap child in currInner.branchesOut {
+                        if !self.checkExistence(group, child.block.id) {
+                            Block curr = child.block;
+                            curr.branchesIn = curr.branchesIn.filter(b => !self.checkExistence(group, b.id));
+                            if !self.checkExistence(nextEntries, curr.id) {
+                                nextEntries.push(curr);
                             }
                         }
                     }
-                    Shape? handledBlock = self.calculate(group, currEntries);
-                    if handledBlock != () {
-                        multiple.handledBlocks[entry.id.toString()] = handledBlock;
-                    }
+                }
+                Shape? handledBlock = self.calculate(group, [entry]);
+                if handledBlock != () {
+                    multiple.handledBlocks[entry.id.toString()] = handledBlock;
                 }
             }
         }
-        multiple.next = self.calculate(validBlocks,nextEntries);
+        multiple.next = self.calculate(validBlocks, nextEntries);
         return multiple;
     }
 
     function calculate(Block[] validBlocks, Block[] entries) returns Shape? {
         if entries.length() == 1 {
             Block entry = entries[0];
-            int inCount = 0;
-            foreach Block prev in entry.branchesIn {
-                if self.checkExistence(validBlocks, prev.id) {
-                    inCount += 1;
-                }
-            }
-            if inCount == 0 {
+            if entry.branchesIn.length() == 0 {
                 return self.createSimpleShape(validBlocks,entry);
             }
             else {
@@ -284,9 +270,9 @@ class Relooper {
         }
     }
 
-    function renderShape(Shape sh) returns Expression[] {
+    function renderShape(Shape sh, string? label = ()) returns Expression[] {
         if sh is SimpleShape {
-            return self.renderSimpleShape(sh);
+            return self.renderSimpleShape(sh, label);
         }
         else if sh is MultipleShape {
             return self.renderMultipleShape(sh);
@@ -296,17 +282,14 @@ class Relooper {
         }
     }
 
-    function renderSimpleShape(SimpleShape simple) returns Expression[] {
+    function renderSimpleShape(SimpleShape simple, string? labelPrev = ()) returns Expression[] {
         Expression[] children = [];
+        Shape? next = simple.next;
         WasmBlock innerBlock = {};
         WasmBlock nextBlock = {};
-        Shape? next = simple.next;
         children.push(innerBlock);
+        innerBlock.body.push(simple.inner.code);
         if next != () {
-            WasmBlock simpleInnerBlock = {
-                body: [simple.inner.code]
-            };
-            innerBlock.body.push(simpleInnerBlock);
             if next is MultipleShape {
                 MultipleShape multiple = next;
                 string label =  "$block$" + self.shapeId.toString() + "$break";
@@ -350,13 +333,24 @@ class Relooper {
                         ifBody = ifBlock;
                         isCond = false;
                     }
-                    else if handledBlock != () {
+                    else {
                         WasmBlock elseBlock = {};
                         Break br = { label : label };
-                        if multiple.handledBlocks.keys().length() == 2 {
+                        if multiple.handledBlocks.length() == 2 && handledBlock != () {
                             Expression[] elseCode = self.renderShape(handledBlock);
-                            foreach Expression expr in elseCode {
-                                elseBlock.body.push(expr);                            
+                            if elseCode.length() == 1 {
+                                Expression bodyBlock = elseCode[0];
+                                if bodyBlock is WasmBlock {
+                                    foreach Expression expr in bodyBlock.body {
+                                        elseBlock.body.push(expr);
+                                    }      
+                                }                      
+                            }
+                            else {
+                                elseBlock.name = label;
+                                foreach Expression expr in elseCode {
+                                    elseBlock.body.push(expr);                            
+                                }
                             }
                             WasmBlock elseBreak = {
                                 body: [br]
@@ -379,7 +373,35 @@ class Relooper {
                 }
             }
             else {
-                io:println("unimplemented");
+                Expression? condition = ();
+                WasmBlock? ifBody = ();
+                WasmBlock? elseBody = ();
+                foreach BlockBranchMap item in simple.inner.branchesOut {
+                    if item.branch.condition != () {
+                        condition = item.branch.condition;
+                        string blockName = "$block$" + self.shapeId.toString() + "$break";
+                        self.shapeId = self.shapeId + 1;
+                        innerBlock.name = blockName;
+                        Break br = { label: blockName };
+                        WasmBlock bl = {
+                            body: [br]
+                        };
+                        ifBody = bl;
+                        Break brL = { label: <string>labelPrev };
+                        WasmBlock blL = {
+                            body: [brL]
+                        };
+                        elseBody = blL;
+                    }
+                }
+                if condition != () && ifBody != () {
+                    If ifExpr = {
+                        condition : condition,
+                        ifBody : ifBody,
+                        elseBody : elseBody
+                    };
+                    innerBlock.body.push(ifExpr);
+                }                
             }
             if next != () {
                 Expression[] nextExprs = self.renderShape(next);
@@ -392,18 +414,38 @@ class Relooper {
                     }
                     children.push(nextBlock);
                 }
-            }
-           
-        }
-        else {
-            innerBlock.body.push(simple.inner.code);
+            } 
         }
         return children;
     }
 
     function renderLoopShape(LoopShape loop) returns Expression[] {
-        panic error("unimplemented");
-
+        Shape? inner = loop.inner;
+        Shape? next = loop.next;
+        Expression[] innerExpr = [];
+        Expression[] nextExpr = [];
+        Expression[] children = [];
+        WasmBlock nextBlock = {};
+        string blockName = "$block$" + self.shapeId.toString() + "$break";
+        self.shapeId = self.shapeId + 1;
+        string loopName = "$shape$" + self.shapeId.toString() + "$continue";
+        self.shapeId = self.shapeId + 1;
+        WasmBlock outerBlock = { name : blockName };
+        WasmLoop loopBlock = { name : loopName };
+        outerBlock.body.push(loopBlock);
+        if inner != () {
+            innerExpr = self.renderShape(inner, blockName);
+            Break breakLoop = { label: loopName };
+            innerExpr.push(breakLoop);
+            loopBlock.loopBody = innerExpr;
+        }
+        children.push(outerBlock);
+        if next != () {
+            nextExpr = self.renderShape(next);
+            nextBlock.body = nextExpr;
+        }
+        children.push(nextBlock);
+        return children;
     }
 
     function renderMultipleShape(MultipleShape multiple) returns Expression[] {
@@ -437,6 +479,25 @@ class Relooper {
                     currStr.push("\n");
                 }
                 foreach Expression expr in curr.body {
+                    currStr.push(self.makeBlockText([expr], spacesCount + 1));
+                }
+                currStr.push(self.printSpaces(spacesCount));
+                currStr.push(")\n");
+            }
+            else if curr is WasmLoop {
+                string? name = curr.name;
+                if name != () {
+                    currStr.push(self.printSpaces(spacesCount));
+                    currStr.push("(loop ");
+                    currStr.push(name);
+                    currStr.push("\n");
+                }
+                else {
+                    currStr.push(self.printSpaces(spacesCount));
+                    currStr.push("(loop");
+                    currStr.push("\n");
+                }
+                foreach Expression expr in curr.loopBody {
                     currStr.push(self.makeBlockText([expr], spacesCount + 1));
                 }
                 currStr.push(self.printSpaces(spacesCount));

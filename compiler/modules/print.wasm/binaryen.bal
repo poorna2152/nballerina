@@ -66,6 +66,12 @@ type Break record {
     string label;
 };
 
+type WasmLoop record {
+    *Expression;
+    Expression[] loopBody = [];
+    string name;
+};
+
 type LiteralInt32 record {
     int i32;
 };
