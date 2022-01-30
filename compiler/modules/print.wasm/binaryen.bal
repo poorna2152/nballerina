@@ -83,78 +83,98 @@ type LiteralInt64 record {
 type Literal LiteralInt32|LiteralInt64;
 
 class Module {
-    private Function[] functions = [];
-    private Export[] exports = [];
+    private string[] functions = [];
+    private string[] imports = [];
+    private string[] exports = [];
 
     function call(string target, Expression[] operands, int numOperands, Type returnType) returns Expression {
-        Call call = {
-            target : target,
-            operands : operands,
-            ty : returnType
-        };
-        return call;
+        string operandsStr = "";
+        foreach int i in 0...numOperands - 1 {
+            if i == numOperands - 1 {
+                operandsStr += <string>operands[i].code;
+            }
+            else {
+                operandsStr += <string>operands[i].code + "\n";
+            }
+        }
+        return { code: "(call $"+ target + operandsStr + ")" };
     }
 
     function localGet(int index, Type ty) returns Expression {
-        LocalGet localGet = {
-            index: index,
-            ty : ty
-        };
-        return localGet;
+        return { code: "(local.get $" + index.toString() + ")" };
     }
-
+    
     function addConst(Literal value) returns Expression {
-        Const constVal = {
-            value : value
-        };
-        return constVal;
+        if value is LiteralInt32 {
+            return { code: "(i32.const "+ value.i32.toString() + ")" };
+        }
+        else {
+            return { code: "(i64.const "+ value.i64.toString() + ")" };
+        }
     }
 
     function addReturn(Expression? value = ()) returns Expression {
-        Return ret = {
-            value : value
-        };
-        return ret;
+        if value != () {
+            return { code: "(return " + <string>(<Expression>value).code + ")" };     
+        }
+        return { code: "(return)" };
     }
 
     function nop() returns Expression {
-        Nop nop = {};
-        return nop;
+        return { code: "(block )" };
     }
          
     function addFunction(string name, Type[] params, Type results, Type[] varTypes, int numVarTypes, Expression body) {
-        Function func = {
-            name : name,
-            body : body,
-            params : params,
-            results : results,
-            vars : varTypes 
-        };
-        self.functions.push(func);  
+        string funcParams = "";
+        string localParams = "";
+        int varCount = 0;
+        foreach int i in 0...params.length() - 1 {
+            funcParams += " (param $" + varCount.toString() + " " + params[i] + ")";
+            varCount += 1;
+        }
+        foreach int i in 0...varTypes.length() - 1 {
+            if i == varTypes.length() - 1 {
+                localParams += "  (local $" + varCount.toString() + " " + varTypes[i] + ")";                
+            }
+            else {
+                localParams += "  (local $" + varCount.toString() + " " + varTypes[i] + ")\n";
+            }
+            varCount += 1;
+        }
+        string funcDef = "(func $" + name + funcParams + "\n" + localParams + "\n" + <string>body.code + " )\n";
+        self.functions.push(funcDef);  
     }
 
-    function addFunctionImport(string internalName, string externalModuleName, string externalBaseName, Type[] params, Type results)  {
-         Function func = {
-            name : internalName,
-            module : externalModuleName,
-            base : externalBaseName,
-            results : results,
-            params : params 
-        };
-        self.functions.push(func);
+    function addFunctionImport(string internalName, string externalModuleName, string externalBaseName, Type params, Type results)  {
+        string funcDef = "(import \"" + externalModuleName + "\" \"" + externalBaseName + "\" (func $" + internalName + " (param " + params + ")";
+        if results != "None" {
+            funcDef += "(param " + results+ ")))";
+        }
+        else{
+            funcDef += "))";
+        }
+        self.imports.push(funcDef);
     }
 
     function addFunctionExport(string internalName, string externalName) {
-        Export exportFunc = {
-            value : internalName,
-            name : externalName
-        };
-        self.exports.push(exportFunc);
+        string funcDef = "(export \"" + externalName + "\"" +  " (func $" + internalName + "))";
+        self.exports.push(funcDef);
     }
 
     // BinaryenModuleDispose and BinaryenModulePrint
     function finish(){
-        panic error("unimplemented");
+        io:println("(module");
+        foreach string imp in self.imports {
+            io:println(" "+ imp);
+        }
+        foreach string exp in self.exports {
+            io:println(" "+ exp);
+        }
+        foreach string func in self.functions {
+            io:print(" ");
+            io:print(func);   
+        }
+        io:println(")");
     }
                                             
 }
