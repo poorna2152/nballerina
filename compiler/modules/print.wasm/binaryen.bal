@@ -1,6 +1,8 @@
 public type IntType "i64"|"i32";
 public type Type "None"|IntType;
 
+public type Op "AddInt32"|"SubInt32"|"MulInt32"|"DivSInt32"|"DivUInt32"|"RemSInt32"|"RemUInt32"|"EqInt32"|"NeInt32"|"LtSInt32"|"LtUInt32"|"LeSInt32"|"LeUInt32"|"GtSInt32"|"GtUInt32"|"GeSInt32"|"GeUInt32";
+
 type Function record {
     Expression? body = ();
     Type[] vars = [];
@@ -159,6 +161,33 @@ class Module {
     function addFunctionExport(string internalName, string externalName) {
         string funcDef = "(export \"" + externalName + "\"" +  " (func $" + internalName + "))";
         self.exports.push(funcDef);
+    }
+
+    function binary(Op op, Expression left, Expression right) returns Expression {
+        if op == "AddInt32" {
+            return { code : "(i32.add\n " + <string>left.code + "\n " + <string>right.code + "\n)"};
+        }
+        else if op == "GtSInt32" {
+            return { code : "(i32.gt_s\n " + <string>left.code + "\n " + <string>right.code + "\n)"};
+        }
+        else if op == "MulInt32" {
+            return { code : "(i32.mul\n " + <string>left.code + "\n " + <string>right.code + "\n)"};
+        }
+        else {
+            return { code : "(i32.rem_s\n " + <string>left.code + "\n " + <string>right.code + "\n)"};
+        }
+    }
+
+    function localSet(int index, Expression value) returns Expression {
+        return { code : "(local.set $" + index.toString() + "\n " + <string>value.code + "\n)" };
+    }
+
+    function block(string? name, Expression[] children, int numChildren, Type ty) returns Expression {
+        WasmBlock block = {
+            body : children,
+            name : name
+        };
+        return block;
     }
 
     // BinaryenModuleDispose and BinaryenModulePrint
