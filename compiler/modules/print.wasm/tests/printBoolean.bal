@@ -1,10 +1,10 @@
-import ballerina/test
+import ballerina/test;
 @test:Config {}
 
 public function printBoolean() returns error? {
     Module module = new;
-    Type[] localTypes = ["i32"];
-    module.addFunctionImport("println", "console", "log", "i32", "None");
+    Type[] params = ["i32"];
+    module.addFunctionImport("println", "console", "log", ["i32"], "None");
     Expression b = module.localGet(0, "i32");
     Expression[] thenCallOperands = [module.addConst({ i32: 1 })];
     Expression thenCall = module.call("println", thenCallOperands, 1, "None");
@@ -20,7 +20,7 @@ public function printBoolean() returns error? {
     relooper.addBranch(bb0, bb2, b);
     relooper.addBranch(bb0, bb1);
     Expression body = relooper.render(bb0, 0);
-    module.addFunction("printBoolean", localTypes, "None", [], 0, body);
+    module.addFunction("printBoolean", params, "None", [], 0, body);
     module.addFunctionExport("printBoolean", "printBoolean");
     module.finish();
 }

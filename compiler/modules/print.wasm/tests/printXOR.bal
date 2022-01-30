@@ -1,10 +1,10 @@
-import ballerina/test
+import ballerina/test;
 @test:Config {}
 
 public function printXOR() returns error? {
     Module module = new;
-    Type[] localTypes = ["i32", "i32"];
-    module.addFunctionImport("println", "console", "log", "i32", "None");
+    Type[] params = ["i32", "i32"];
+    module.addFunctionImport("println", "console", "log", ["i32"], "None");
     Expression x = module.localGet(0, "i32");
     Expression y = module.localGet(1, "i32");
     Expression[] thenCallOperands = [module.addConst({ i32: 1 })];
@@ -35,7 +35,7 @@ public function printXOR() returns error? {
     relooper.addBranch(bb7, bb8);
     relooper.addBranch(bb8, bb9);
     Expression body = relooper.render(bb0, 0);
-    module.addFunction("printXOR", localTypes, "None", [], 2, body);
+    module.addFunction("printXOR", params, "None", [], 2, body);
     module.addFunctionExport("printXOR", "printXOR");
     module.finish();
 }
