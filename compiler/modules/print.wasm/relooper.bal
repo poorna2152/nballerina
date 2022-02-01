@@ -452,14 +452,6 @@ class Relooper {
         panic error("unimplemented");
     }
 
-    function printSpaces(int spaceCount) returns string {
-        string spaces = "";
-        foreach int i in 0...spaceCount {
-            spaces += " ";
-        }
-        return spaces;
-    }
-
     function makeBlockText(Expression[] result, int spacesCount) returns string {
         Expression curr;
         string[] currStr = [];
@@ -468,71 +460,54 @@ class Relooper {
             if curr is WasmBlock {
                 string? name = curr.name;
                 if name != () {
-                    currStr.push(self.printSpaces(spacesCount));
                     currStr.push("(block ");
                     currStr.push(name);
-                    currStr.push("\n");
                 }
                 else {
-                    currStr.push(self.printSpaces(spacesCount));
-                    currStr.push("(block");
-                    currStr.push("\n");
+                    currStr.push("(block ");
                 }
                 foreach Expression expr in curr.body {
                     currStr.push(self.makeBlockText([expr], spacesCount + 1));
                 }
-                currStr.push(self.printSpaces(spacesCount));
-                currStr.push(")\n");
+                currStr.push(")");
             }
             else if curr is WasmLoop {
                 string? name = curr.name;
                 if name != () {
-                    currStr.push(self.printSpaces(spacesCount));
                     currStr.push("(loop ");
                     currStr.push(name);
-                    currStr.push("\n");
                 }
                 else {
-                    currStr.push(self.printSpaces(spacesCount));
-                    currStr.push("(loop");
-                    currStr.push("\n");
+                    currStr.push("(loop ");
                 }
                 foreach Expression expr in curr.loopBody {
                     currStr.push(self.makeBlockText([expr], spacesCount + 1));
                 }
-                currStr.push(self.printSpaces(spacesCount));
-                currStr.push(")\n");
+                currStr.push(")");
             }
             else if curr is If {
                 If ifExpr = curr;
                 WasmBlock? elseBody = ifExpr.elseBody;
-                currStr.push(self.printSpaces(spacesCount));
-                currStr.push("(if\n");
+                currStr.push("(if ");
                 string? conditionCode = ifExpr.condition.code;
                 if conditionCode != () {
-                    currStr.push(self.printSpaces(spacesCount + 1));
                     currStr.push(conditionCode);
-                    currStr.push("\n");
                 }
                 currStr.push(self.makeBlockText([ifExpr.ifBody], spacesCount + 1));
                 if elseBody != () {
                     currStr.push(self.makeBlockText([elseBody], spacesCount + 1));
                 }
-                currStr.push(self.printSpaces(spacesCount));
-                currStr.push(")\n");
+                currStr.push(")");
             }
             else if curr is Break {
-                currStr.push(self.printSpaces(spacesCount));
                 currStr.push("(br ");
                 currStr.push(curr.label);
-                currStr.push(")\n");
+                currStr.push(")");
             }
             else {
                 string? code = curr.code;
                 if code != () {
-                    currStr.push(self.printSpaces(spacesCount));
                     currStr.push(code);
-                    currStr.push("\n");
                 }
             }
         }

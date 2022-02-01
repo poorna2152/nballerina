@@ -85,19 +85,14 @@ type LiteralInt64 record {
 type Literal LiteralInt32|LiteralInt64;
 
 class Module {
-    private string[] functions = [];
+    private Function[] functions = [];
     private string[] imports = [];
     private string[] exports = [];
 
     function call(string target, Expression[] operands, int numOperands, Type returnType) returns Expression {
         string operandsStr = "";
         foreach int i in 0...numOperands - 1 {
-            if i == numOperands - 1 {
-                operandsStr += <string>operands[i].code;
-            }
-            else {
-                operandsStr += <string>operands[i].code + "\n";
-            }
+            operandsStr += <string>operands[i].code;
         }
         return { code: "(call $"+ target + operandsStr + ")" };
     }
@@ -127,24 +122,14 @@ class Module {
     }
          
     function addFunction(string name, Type[] params, Type results, Type[] varTypes, int numVarTypes, Expression body) {
-        string funcParams = "";
-        string localParams = "";
-        int varCount = 0;
-        foreach int i in 0...params.length() - 1 {
-            funcParams += " (param $" + varCount.toString() + " " + params[i] + ")";
-            varCount += 1;
-        }
-        foreach int i in 0...varTypes.length() - 1 {
-            if i == varTypes.length() - 1 {
-                localParams += "  (local $" + varCount.toString() + " " + varTypes[i] + ")";                
-            }
-            else {
-                localParams += "  (local $" + varCount.toString() + " " + varTypes[i] + ")\n";
-            }
-            varCount += 1;
-        }
-        string funcDef = "(func $" + name + funcParams + "\n" + localParams + "\n" + <string>body.code + " )\n";
-        self.functions.push(funcDef);  
+        Function func = {
+            name: name,
+            params: params,
+            results: results,
+            vars: varTypes,
+            body: body
+        };
+        self.functions.push(func);  
     }
 
     function addFunctionImport(string internalName, string externalModuleName, string externalBaseName, Type params, Type results)  {
@@ -165,21 +150,21 @@ class Module {
 
     function binary(Op op, Expression left, Expression right) returns Expression {
         if op == "AddInt32" {
-            return { code : "(i32.add\n " + <string>left.code + "\n " + <string>right.code + "\n)"};
+            return { code : "(i32.add " + <string>left.code + <string>right.code + " )"};
         }
         else if op == "GtSInt32" {
-            return { code : "(i32.gt_s\n " + <string>left.code + "\n " + <string>right.code + "\n)"};
+            return { code : "(i32.gt_s " + <string>left.code + <string>right.code + " )"};
         }
         else if op == "MulInt32" {
-            return { code : "(i32.mul\n " + <string>left.code + "\n " + <string>right.code + "\n)"};
+            return { code : "(i32.mul " + <string>left.code + <string>right.code + " )"};
         }
         else {
-            return { code : "(i32.rem_s\n " + <string>left.code + "\n " + <string>right.code + "\n)"};
+            return { code : "(i32.rem_s " + <string>left.code + <string>right.code + " )"};
         }
     }
 
     function localSet(int index, Expression value) returns Expression {
-        return { code : "(local.set $" + index.toString() + "\n " + <string>value.code + "\n)" };
+        return { code : "(local.set $" + index.toString() + <string>value.code + " )" };
     }
 
     function block(string? name, Expression[] children, int numChildren, Type ty) returns Expression {
@@ -190,20 +175,108 @@ class Module {
         return block;
     }
 
+    function printSpaces(int spaceCount) returns string {
+        string spaces = "";
+        foreach int i in 0...spaceCount - 1 {
+            spaces += " ";
+        }
+        return spaces;
+    }
+
+    function containCharacter(string text) returns boolean {
+        foreach string chr in text {
+            if chr != " " {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function getCommand(string cmd) returns string {
+        string result = "";
+        foreach string chr in cmd {
+            if chr != " " && chr != "(" {
+                result += chr;
+            }
+        }
+        return result;
+    }
+
     // BinaryenModuleDispose and BinaryenModulePrint
-    function finish(){
-        io:println("(module");
+    function finish() {
+        string[] module = [];
+        module.push("(module ");
         foreach string imp in self.imports {
-            io:println(" "+ imp);
+            module.push(" " + imp);
         }
         foreach string exp in self.exports {
-            io:println(" "+ exp);
+            module.push(" " + exp);
         }
-        foreach string func in self.functions {
-            io:print(" ");
-            io:print(func);   
+        foreach Function func in self.functions {
+            string funcParams = "";
+            string localParams = "";
+            int varCount = 0;
+            foreach int i in 0...func.params.length() - 1 {
+                funcParams += " (param $" + varCount.toString() + " " + func.params[i] + ")";
+                varCount += 1;
+            }
+            foreach int i in 0...func.vars.length() - 1 {
+                if i == func.vars.length() - 1 {
+                    localParams += "(local $" + varCount.toString() + " " + func.vars[i] + ")";                
+                }
+                else {
+                    localParams += "(local $" + varCount.toString() + " " + func.vars[i] + ")";
+                }
+                varCount += 1;
+            }
+            string funcDef = " (func $" + func.name + funcParams + localParams;
+            module.push(funcDef); 
+            string[] noSeperateCmd = ["local.get","return","br", "i32.const"];
+            int spaces = 2;
+            string cmd = "";
+            string currentCmd = "";
+            boolean cmdIn = false;
+            foreach string chr in <string>(<Expression>func.body).code {
+                if chr == "(" {
+                    if self.containCharacter(cmd) {
+                        module.push(cmd);
+                    }
+                    spaces += 1;
+                    cmdIn = true;
+                    cmd = self.printSpaces(spaces);
+                    cmd += "(";
+                }
+                else if chr == ")" {
+                    if noSeperateCmd.filter(c => c == self.getCommand(currentCmd)).length() > 0 {
+                        cmd += ")";
+                        module.push(cmd);
+                        cmd = self.printSpaces(spaces);
+                        currentCmd = "";
+                    }
+                    else {
+                        if self.containCharacter(cmd) {
+                            module.push(cmd);
+                        }
+                        cmd = self.printSpaces(spaces);
+                        cmd += ")";
+                        module.push(cmd);
+                        cmd = "";
+                    }
+                    spaces -= 1;            
+                }
+                else {
+                    if chr == " " && cmdIn { 
+                        currentCmd = cmd;
+                        cmdIn = false;
+                    }
+                    cmd += chr;
+                }
+            }
+            module.push(" )");  
         }
-        io:println(")");
+        module.push(")");
+        string cmds = "\n".'join(...module);
+        io:println(cmds);
     }
                                             
 }
