@@ -343,19 +343,19 @@ class Relooper {
                                 if bodyBlock is WasmBlock {
                                     foreach Expression expr in bodyBlock.body {
                                         elseBlock.body.push(expr);
-                                    }      
-                                }                      
+                                    }
+                                }
                             }
                             else {
                                 elseBlock.name = label;
                                 foreach Expression expr in elseCode {
-                                    elseBlock.body.push(expr);                            
+                                    elseBlock.body.push(expr);
                                 }
                             }
                             WasmBlock elseBreak = {
                                 body: [br]
                             };
-                            elseBlock.body.push(elseBreak);   
+                            elseBlock.body.push(elseBreak);
                         }
                         else {
                             elseBlock.body.push(br);
@@ -401,7 +401,7 @@ class Relooper {
                         elseBody : elseBody
                     };
                     innerBlock.body.push(ifExpr);
-                }                
+                }
             }
             if next != () {
                 Expression[] nextExprs = self.renderShape(next);
@@ -414,7 +414,7 @@ class Relooper {
                     }
                     children.push(nextBlock);
                 }
-            } 
+            }
         }
         return children;
     }

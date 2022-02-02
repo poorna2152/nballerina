@@ -1,10 +1,11 @@
+import ballerina/io;
 public type IntType "i64"|"i32";
 public type Type "None"|IntType;
 
 public type Op "AddInt32"|"SubInt32"|"MulInt32"|"DivSInt32"|"DivUInt32"|"RemSInt32"|"RemUInt32"|"EqInt32"|"NeInt32"|"LtSInt32"|"LtUInt32"|"LeSInt32"|"LeUInt32"|"GtSInt32"|"GtUInt32"|"GeSInt32"|"GeUInt32";
 
 type Function record {
-    Expression? body = ();
+    Expression body;
     Type[] vars = [];
     string name;
     string? module = ();
@@ -90,17 +91,21 @@ class Module {
     private string[] exports = [];
 
     function call(string target, Expression[] operands, int numOperands, Type returnType) returns Expression {
-        string operandsStr = "";
+        string[] callInst = ["(call $", target];
         foreach int i in 0...numOperands - 1 {
-            operandsStr += <string>operands[i].code;
+            string? code = operands[i].code;
+            if code != () {
+                callInst.push(code);
         }
-        return { code: "(call $"+ target + operandsStr + ")" };
+        }
+        callInst.push(")");
+        return { code: "".'join(...callInst) };
     }
 
     function localGet(int index, Type ty) returns Expression {
         return { code: "(local.get $" + index.toString() + ")" };
     }
-    
+
     function addConst(Literal value) returns Expression {
         if value is LiteralInt32 {
             return { code: "(i32.const "+ value.i32.toString() + ")" };
@@ -111,16 +116,21 @@ class Module {
     }
 
     function addReturn(Expression? value = ()) returns Expression {
+        string[] inst = ["(return"];
         if value != () {
-            return { code: "(return " + <string>(<Expression>value).code + ")" };     
+            string? code = value.code;
+            if code != () {
+                inst.push(code);
         }
-        return { code: "(return)" };
+        }
+        inst.push(")");
+        return { code: " ".'join(...inst) };
     }
 
     function nop() returns Expression {
         return { code: "(block )" };
     }
-         
+
     function addFunction(string name, Type[] params, Type results, Type[] varTypes, int numVarTypes, Expression body) {
         Function func = {
             name: name,
@@ -129,18 +139,20 @@ class Module {
             vars: varTypes,
             body: body
         };
-        self.functions.push(func);  
+        self.functions.push(func);
     }
 
     function addFunctionImport(string internalName, string externalModuleName, string externalBaseName, Type params, Type results)  {
-        string funcDef = "(import \"" + externalModuleName + "\" \"" + externalBaseName + "\" (func $" + internalName + " (param " + params + ")";
+        string[] funcDef = ["(import \"", externalModuleName, "\" \"", externalBaseName, "\" (func $", internalName, " (param ", params, ")"];
         if results != "None" {
-            funcDef += "(param " + results+ ")))";
+            funcDef.push("(param ");
+            funcDef.push(results);
+            funcDef.push(")))");
         }
         else{
-            funcDef += "))";
+            funcDef.push("))");
         }
-        self.imports.push(funcDef);
+        self.imports.push("".'join(...funcDef));
     }
 
     function addFunctionExport(string internalName, string externalName) {
@@ -149,22 +161,39 @@ class Module {
     }
 
     function binary(Op op, Expression left, Expression right) returns Expression {
+        string? leftCode = left.code;
+        string? rightCode = right.code;
+        string[]  binInst = [];
+        if leftCode != () && rightCode != () {
         if op == "AddInt32" {
-            return { code : "(i32.add " + <string>left.code + <string>right.code + " )"};
+                binInst.push("(i32.add");
         }
         else if op == "GtSInt32" {
-            return { code : "(i32.gt_s " + <string>left.code + <string>right.code + " )"};
+                binInst.push("(i32.gt_s");
         }
         else if op == "MulInt32" {
-            return { code : "(i32.mul " + <string>left.code + <string>right.code + " )"};
+                binInst.push("(i32.mul");
+            }
+            else if op == "RemSInt32" {
+                binInst.push("(i32.rem_s");
         }
         else {
-            return { code : "(i32.rem_s " + <string>left.code + <string>right.code + " )"};
+                panic error("unimplemented");
         }
+            binInst.push(leftCode);
+            binInst.push(rightCode);
+            binInst.push(")");
+            return { code : " ".'join(...binInst) };
+        }
+        panic error("invalid");
     }
 
     function localSet(int index, Expression value) returns Expression {
-        return { code : "(local.set $" + index.toString() + <string>value.code + " )" };
+        string? code = value.code;
+        if code != () {
+            return { code : "(local.set $" + index.toString() + code + " )" };
+        }
+        panic error("invalid");
     }
 
     function block(string? name, Expression[] children, int numChildren, Type ty) returns Expression {
@@ -173,33 +202,6 @@ class Module {
             name : name
         };
         return block;
-    }
-
-    function printSpaces(int spaceCount) returns string {
-        string spaces = "";
-        foreach int i in 0...spaceCount - 1 {
-            spaces += " ";
-        }
-        return spaces;
-    }
-
-    function containCharacter(string text) returns boolean {
-        foreach string chr in text {
-            if chr != " " {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    function getCommand(string cmd) returns string {
-        string result = "";
-        foreach string chr in cmd {
-            if chr != " " && chr != "(" {
-                result += chr;
-            }
-        }
-        return result;
     }
 
     // BinaryenModuleDispose and BinaryenModulePrint
@@ -221,62 +223,87 @@ class Module {
                 varCount += 1;
             }
             foreach int i in 0...func.vars.length() - 1 {
-                if i == func.vars.length() - 1 {
-                    localParams += "(local $" + varCount.toString() + " " + func.vars[i] + ")";                
-                }
-                else {
                     localParams += "(local $" + varCount.toString() + " " + func.vars[i] + ")";
-                }
                 varCount += 1;
             }
             string funcDef = " (func $" + func.name + funcParams + localParams;
-            module.push(funcDef); 
+            module.push(funcDef);
+            string? funcBody = func.body.code;
+            if funcBody != () {
             string[] noSeperateCmd = ["local.get","return","br", "i32.const"];
             int spaces = 2;
             string cmd = "";
             string currentCmd = "";
             boolean cmdIn = false;
-            foreach string chr in <string>(<Expression>func.body).code {
+                foreach string chr in funcBody {
                 if chr == "(" {
-                    if self.containCharacter(cmd) {
+                    if containCharacter(cmd) {
                         module.push(cmd);
                     }
                     spaces += 1;
                     cmdIn = true;
-                    cmd = self.printSpaces(spaces);
+                    cmd = printSpaces(spaces);
                     cmd += "(";
                 }
                 else if chr == ")" {
-                    if noSeperateCmd.filter(c => c == self.getCommand(currentCmd)).length() > 0 {
+                    if noSeperateCmd.filter(c => c == getCommand(currentCmd)).length() > 0 {
                         cmd += ")";
                         module.push(cmd);
-                        cmd = self.printSpaces(spaces);
+                        cmd = printSpaces(spaces);
                         currentCmd = "";
                     }
                     else {
-                        if self.containCharacter(cmd) {
+                        if containCharacter(cmd) {
                             module.push(cmd);
                         }
-                        cmd = self.printSpaces(spaces);
+                        cmd = printSpaces(spaces);
                         cmd += ")";
                         module.push(cmd);
                         cmd = "";
                     }
-                    spaces -= 1;            
+                    spaces -= 1;
                 }
                 else {
-                    if chr == " " && cmdIn { 
+                    if chr == " " && cmdIn {
                         currentCmd = cmd;
                         cmdIn = false;
                     }
                     cmd += chr;
+                    }
                 }
             }
-            module.push(" )");  
+            module.push(" )");
         }
         module.push(")");
         string cmds = "\n".'join(...module);
         io:println(cmds);
     }
-                                            
+
+}
+
+function printSpaces(int spaceCount) returns string {
+    string spaces = "";
+    foreach int i in 0...spaceCount - 1 {
+        spaces += " ";
+    }
+    return spaces;
+}
+
+function containCharacter(string text) returns boolean {
+    foreach string chr in text {
+        if chr != " " {
+            return true;
+        }
+    }
+    return false;
+}
+
+function getCommand(string cmd) returns string {
+    string result = "";
+    foreach string chr in cmd {
+        if chr != " " && chr != "(" {
+            result += chr;
+        }
+    }
+    return result;
 }
