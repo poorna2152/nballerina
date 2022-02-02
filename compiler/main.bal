@@ -1,6 +1,6 @@
 import wso2/nballerina.bir;
 import wso2/nballerina.front;
-import wso2/nballerina.nback;
+import wso2/nballerina.wback;
 import wso2/nballerina.err;
 
 import ballerina/io;
@@ -36,7 +36,7 @@ function compileFile(string filename, string? outputFilename) returns CompileErr
        organization: "dummy"
     };
     bir:Module module = check front:loadModule(filename, id);
-    check nback:compileModule(module, outputFilename);
+    check wback:compileModule(module, outputFilename);
 }
 
 function chooseOutputFilename(string sourceFilename, string? outDir) returns string|error? {
