@@ -1,6 +1,7 @@
 import wso2/nballerina.bir;
 import wso2/nballerina.front;
 import wso2/nballerina.wback;
+import wso2/nballerina.nback;
 import wso2/nballerina.err;
 
 import ballerina/io;

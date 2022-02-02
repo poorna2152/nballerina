@@ -1,15 +1,15 @@
-type Block record {
+public type Block record {
     Expression code;
     int id;
     BlockBranchMap[] branchesOut = [];
     Block[] branchesIn =[];
 };
 
-type Branch record {
+public type Branch record {
     Expression? condition =();
 };
 
-type BlockBranchMap record {
+public type BlockBranchMap record {
     Branch branch;
     Block block;
 };
@@ -22,7 +22,7 @@ type SimpleShape record {
 type MultipleShape record {
     Shape? next = ();
     map<Shape> handledBlocks = {};
-}; 
+};
 
 type LoopShape record {
     Shape? inner;
@@ -31,7 +31,7 @@ type LoopShape record {
 
 type Shape SimpleShape|MultipleShape|LoopShape;
 
-class Relooper {
+public class Relooper {
     private Module module;
     private Branch[] branches =[];
     private Block[] blocks = [];
@@ -40,11 +40,11 @@ class Relooper {
     private Shape? root = ();
     private int shapeId = 1;
 
-    function init(Module module) {
+    public function init(Module module) {
         self.module = module;
     }
 
-    function addBranch(Block fromB, Block to, Expression? condition = ()) {
+    public function addBranch(Block fromB, Block to, Expression? condition = ()) {
         Branch branch = {
             condition: condition
         };
@@ -56,7 +56,7 @@ class Relooper {
         to.branchesIn.push(fromB);
     }
 
-    function addBlock(Expression code) returns Block {
+    public function addBlock(Expression code) returns Block {
         Block block = {
             code: code,
             id: self.blockId
@@ -76,7 +76,7 @@ class Relooper {
             return false;
         }
         return false;
-    } 
+    }
 
     function createSimpleShape(Block[] blocks, Block entry) returns Shape {
         Block[] nextEntries = [];
@@ -172,7 +172,7 @@ class Relooper {
                         ownership[child.block.id.toString()] = owner;
                         Block[]? group = independentGroups[owner.id.toString()];
                         if group != () {
-                            group.push(child.block);            
+                            group.push(child.block);
                             independentGroups[owner.id.toString()] = group;
                         }
                     }
@@ -183,10 +183,10 @@ class Relooper {
                         }
                         else if existingOwner.id != owner.id {
                             self.invalidateChildren(child.block, ownership, independentGroups);
-                        } 
+                        }
                     }
                 }
-            } 
+            }
         }
         foreach Block entry in entries {
             Block[]? group = independentGroups[entry.id.toString()];
@@ -320,13 +320,13 @@ class Relooper {
                             if bodyBlock is WasmBlock {
                                 foreach Expression expr in bodyBlock.body {
                                     ifBlock.body.push(expr);
-                                }      
-                            }                      
+                                }
+                            }
                         }
                         else {
                             ifBlock.name = label;
                             foreach Expression expr in ifCode {
-                               ifBlock.body.push(expr);                            
+                               ifBlock.body.push(expr);
                             }
                         }
                         ifBlock.body.push(ifBreakBlock);
@@ -514,7 +514,7 @@ class Relooper {
         return "".'join(...currStr);
     }
 
-    function render(Block body, int labelHelper) returns Expression {
+    public function render(Block body, int labelHelper) returns Expression {
         self.root = self.calculate(self.blocks, [body]);
         Expression[] result = [];
         Shape? parent = self.root;

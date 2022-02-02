@@ -4,7 +4,7 @@ public type Type "None"|IntType;
 
 public type Op "AddInt32"|"SubInt32"|"MulInt32"|"DivSInt32"|"DivUInt32"|"RemSInt32"|"RemUInt32"|"EqInt32"|"NeInt32"|"LtSInt32"|"LtUInt32"|"LeSInt32"|"LeUInt32"|"GtSInt32"|"GtUInt32"|"GeSInt32"|"GeUInt32";
 
-type Function record {
+public type Function record {
     Expression body;
     Type[] vars = [];
     string name;
@@ -14,16 +14,16 @@ type Function record {
     Type? results = ();
 };
 
-type Export record {
+public type Export record {
     string value;
     string name;
 };
 
-type Expression record {
+public type Expression record {
     string? code = ();
 };
 
-type Call record {
+public type Call record {
     *Expression;
     Expression[] operands;
     string target;
@@ -31,66 +31,66 @@ type Call record {
     Type ty;
 };
 
-type LocalGet record {
+public type LocalGet record {
     *Expression;
     int index;
     Type ty;
 };
 
-type Const record {
+public type Const record {
     *Expression;
     Literal value;
 };
 
-type Return record {
+public type Return record {
     *Expression;
     Expression? value = ();
 };
 
-type Nop record {
+public type Nop record {
     *Expression;
 };
 
-type WasmBlock record {
+public type WasmBlock record {
     *Expression;
     Expression[] body = [];
     string? name = ();
 };
 
-type If record {
+public type If record {
     *Expression;
     Expression condition;
     WasmBlock? elseBody;
     WasmBlock ifBody;
 };
 
-type Break record {
+public type Break record {
     *Expression;
     string label;
 };
 
-type WasmLoop record {
+public type WasmLoop record {
     *Expression;
     Expression[] loopBody = [];
     string name;
 };
 
-type LiteralInt32 record {
+public type LiteralInt32 record {
     int i32;
 };
 
-type LiteralInt64 record {
+public type LiteralInt64 record {
     int i64;
 };
 
-type Literal LiteralInt32|LiteralInt64;
+public type Literal LiteralInt32|LiteralInt64;
 
-class Module {
+public class Module {
     private Function[] functions = [];
     private string[] imports = [];
     private string[] exports = [];
 
-    function call(string target, Expression[] operands, int numOperands, Type returnType) returns Expression {
+    public function call(string target, Expression[] operands, int numOperands, Type returnType) returns Expression {
         string[] callInst = ["(call $", target];
         foreach int i in 0...numOperands - 1 {
             string? code = operands[i].code;
@@ -102,11 +102,11 @@ class Module {
         return { code: "".'join(...callInst) };
     }
 
-    function localGet(int index, Type ty) returns Expression {
+    public function localGet(int index, Type ty) returns Expression {
         return { code: "(local.get $" + index.toString() + ")" };
     }
 
-    function addConst(Literal value) returns Expression {
+    public function addConst(Literal value) returns Expression {
         if value is LiteralInt32 {
             return { code: "(i32.const "+ value.i32.toString() + ")" };
         }
@@ -115,7 +115,7 @@ class Module {
         }
     }
 
-    function addReturn(Expression? value = ()) returns Expression {
+    public function addReturn(Expression? value = ()) returns Expression {
         string[] inst = ["(return"];
         if value != () {
             string? code = value.code;
@@ -127,11 +127,11 @@ class Module {
         return { code: " ".'join(...inst) };
     }
 
-    function nop() returns Expression {
+    public function nop() returns Expression {
         return { code: "(block )" };
     }
 
-    function addFunction(string name, Type[] params, Type results, Type[] varTypes, int numVarTypes, Expression body) {
+    public function addFunction(string name, Type[] params, Type results, Type[] varTypes, int numVarTypes, Expression body) {
         Function func = {
             name: name,
             params: params,
@@ -142,7 +142,7 @@ class Module {
         self.functions.push(func);
     }
 
-    function addFunctionImport(string internalName, string externalModuleName, string externalBaseName, Type params, Type results)  {
+    public function addFunctionImport(string internalName, string externalModuleName, string externalBaseName, Type params, Type results)  {
         string[] funcDef = ["(import \"", externalModuleName, "\" \"", externalBaseName, "\" (func $", internalName, " (param ", params, ")"];
         if results != "None" {
             funcDef.push("(param ");
@@ -155,12 +155,12 @@ class Module {
         self.imports.push("".'join(...funcDef));
     }
 
-    function addFunctionExport(string internalName, string externalName) {
+    public function addFunctionExport(string internalName, string externalName) {
         string funcDef = "(export \"" + externalName + "\"" +  " (func $" + internalName + "))";
         self.exports.push(funcDef);
     }
 
-    function binary(Op op, Expression left, Expression right) returns Expression {
+    public function binary(Op op, Expression left, Expression right) returns Expression {
         string? leftCode = left.code;
         string? rightCode = right.code;
         string[]  binInst = [];
@@ -188,7 +188,7 @@ class Module {
         panic error("invalid");
     }
 
-    function localSet(int index, Expression value) returns Expression {
+    public function localSet(int index, Expression value) returns Expression {
         string? code = value.code;
         if code != () {
             return { code : "(local.set $" + index.toString() + code + " )" };
@@ -196,7 +196,7 @@ class Module {
         panic error("invalid");
     }
 
-    function block(string? name, Expression[] children, int numChildren, Type ty) returns Expression {
+    public function block(string? name, Expression[] children, int numChildren, Type ty) returns Expression {
         WasmBlock block = {
             body : children,
             name : name
@@ -205,7 +205,7 @@ class Module {
     }
 
     // BinaryenModuleDispose and BinaryenModulePrint
-    function finish() {
+    public function finish() {
         string[] module = [];
         module.push("(module ");
         foreach string imp in self.imports {
