@@ -1,7 +1,7 @@
 import ballerina/test;
 @test:Config {}
 
-public function printTrue() returns error? {
+public function printTrue() returns string[] {
     Module module = new;
     Type[] params = ["i32"];
     module.addFunctionImport("println", "console", "log", "i32", "None");
@@ -18,5 +18,5 @@ public function printTrue() returns error? {
     Expression body = relooper.render(bb0, 0);
     module.addFunction("printTrue", params, "None", [], 1, body);
     module.addFunctionExport("printTrue", "printTrue");
-    module.finish();
+    return module.finish();
 }

@@ -1,7 +1,7 @@
 import ballerina/test;
 @test:Config {}
 
-public function printBoolean() returns error? {
+public function printBoolean() returns string[] {
     Module module = new;
     Type[] params = ["i32"];
     module.addFunctionImport("println", "console", "log", "i32", "None");
@@ -22,5 +22,5 @@ public function printBoolean() returns error? {
     Expression body = relooper.render(bb0, 0);
     module.addFunction("printBoolean", params, "None", [], 0, body);
     module.addFunctionExport("printBoolean", "printBoolean");
-    module.finish();
+    return module.finish();
 }

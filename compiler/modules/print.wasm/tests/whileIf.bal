@@ -1,7 +1,7 @@
 import ballerina/test;
 @test:Config {}
 
-public function whileIf() returns error? {
+public function whileIf() returns string[] {
     Module module = new;
     Type[] params = ["i32"];
     Type[] localTypes = ["i32", "i32"];
@@ -38,6 +38,6 @@ public function whileIf() returns error? {
     Expression body = relooper.render(bb0, 0);
     module.addFunction("sum", params, "None", localTypes, 2, body);
     module.addFunctionExport("sum", "sum");
-    module.finish();
+    return module.finish();
 }
 

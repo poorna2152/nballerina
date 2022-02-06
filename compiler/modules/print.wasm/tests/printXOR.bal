@@ -1,7 +1,7 @@
 import ballerina/test;
 @test:Config {}
 
-public function printXOR() returns error? {
+public function printXOR() returns string[] {
     Module module = new;
     Type[] params = ["i32", "i32"];
     module.addFunctionImport("println", "console", "log", "i32", "None");
@@ -37,5 +37,5 @@ public function printXOR() returns error? {
     Expression body = relooper.render(bb0, 0);
     module.addFunction("printXOR", params, "None", [], 2, body);
     module.addFunctionExport("printXOR", "printXOR");
-    module.finish();
+    return module.finish();
 }

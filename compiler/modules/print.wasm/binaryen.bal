@@ -1,8 +1,7 @@
-import ballerina/io;
 public type IntType "i64"|"i32";
 public type Type "None"|IntType;
 
-public type Op "AddInt32"|"SubInt32"|"MulInt32"|"DivSInt32"|"DivUInt32"|"RemSInt32"|"RemUInt32"|"EqInt32"|"NeInt32"|"LtSInt32"|"LtUInt32"|"LeSInt32"|"LeUInt32"|"GtSInt32"|"GtUInt32"|"GeSInt32"|"GeUInt32";
+public type Op "AddInt32"|"SubInt32"|"MulInt32"|"DivSInt32"|"DivUInt32"|"RemSInt32"|"RemUInt32"|"EqInt32"|"NeInt32"|"LtSInt32"|"LtUInt32"|"LeSInt32"|"LeUInt32"|"GtSInt32"|"GtUInt32"|"GeSInt32"|"GeUInt32"|"OrInt32"|"XorInt32";
 
 public type Function record {
     Expression body;
@@ -165,23 +164,67 @@ public class Module {
         string? rightCode = right.code;
         string[]  binInst = [];
         if leftCode != () && rightCode != () {
-        if op == "AddInt32" {
+            if op == "AddInt32" {
                 binInst.push("(i32.add");
-        }
-        else if op == "GtSInt32" {
-                binInst.push("(i32.gt_s");
-        }
-        else if op == "MulInt32" {
+            }
+            else if op == "SubInt32" {
+                binInst.push("(i32.sub");
+            }
+            else if op == "DivSInt32" {
+                binInst.push("(i32.div_s");
+            }
+            else if op == "MulInt32" {
                 binInst.push("(i32.mul");
             }
             else if op == "RemSInt32" {
                 binInst.push("(i32.rem_s");
-        }
-        else {
-                panic error("unimplemented");
-        }
+            }
+            else if op == "LtSInt32" {
+                binInst.push("(i32.lt_s");
+            }
+            else if op == "LeSInt32" {
+                binInst.push("(i32.le_s");
+            }
+            else if op == "GtSInt32" {
+                binInst.push("(i32.gt_s");
+            }
+            else if op == "GeSInt32" {
+                binInst.push("(i32.ge_s");
+            }
+            else if op == "EqInt32" {
+                binInst.push("(i32.eq");
+            }
+            else if op == "NeInt32" {
+                binInst.push("(i32.eq");
+            }
+            else if op == "OrInt32" {
+                binInst.push("(i32.or");
+            }
+            else if op == "XorInt32" {
+                binInst.push("(i32.xor");
+            }
+            else {
+            panic error("unimplemented");
+            }
             binInst.push(leftCode);
             binInst.push(rightCode);
+            binInst.push(")");
+            return { code : " ".'join(...binInst) };
+        }
+        panic error("invalid");
+    }
+
+    public function unary(Op op, Expression value) returns Expression {
+        string? code = value.code;
+        string[]  binInst = [];
+        if code != () {
+            if op == "No" {
+                binInst.push("(i32.add");
+            }
+            else {
+                panic error("unimplemented");
+            }
+            binInst.push(code);
             binInst.push(")");
             return { code : " ".'join(...binInst) };
         }
@@ -205,7 +248,7 @@ public class Module {
     }
 
     // BinaryenModuleDispose and BinaryenModulePrint
-    public function finish() {
+    public function finish() returns string[] {
         string[] module = [];
         module.push("(module ");
         foreach string imp in self.imports {
@@ -216,22 +259,23 @@ public class Module {
         }
         foreach Function func in self.functions {
             string funcParams = "";
-            string localParams = "";
+            string localParam = "";
             int varCount = 0;
             foreach int i in 0...func.params.length() - 1 {
                 funcParams += " (param $" + varCount.toString() + " " + func.params[i] + ")";
                 varCount += 1;
             }
+            string funcDef = " (func $" + func.name + funcParams;
+            module.push(funcDef);
             foreach int i in 0...func.vars.length() - 1 {
-                    localParams += "(local $" + varCount.toString() + " " + func.vars[i] + ")";
+                localParam = "  (local $" + varCount.toString() + " " + func.vars[i] + ")";
+                module.push(localParam);
                 varCount += 1;
             }
-            string funcDef = " (func $" + func.name + funcParams + localParams;
-            module.push(funcDef);
             string? funcBody = func.body.code;
             if funcBody != () {
             string[] noSeperateCmd = ["local.get","return","br", "i32.const"];
-            int spaces = 2;
+            int spaces = 1;
             string cmd = "";
             string currentCmd = "";
             boolean cmdIn = false;
@@ -275,8 +319,7 @@ public class Module {
             module.push(" )");
         }
         module.push(")");
-        string cmds = "\n".'join(...module);
-        io:println(cmds);
+        return module;
     }
 
 }
