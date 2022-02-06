@@ -1,42 +1,54 @@
 public type Block record {
     Expression code;
-    int id;
-    BlockBranchMap[] branchesOut = [];
-    Block[] branchesIn =[];
+    readonly int id;
+    Shape? parent = ();
+    table<Branch> key(toId) branchesOut = table [];
+    int[] branchesIn = [];
 };
+
+public enum FlowType {
+    Br,
+    Direct,
+    Continue
+}
 
 public type Branch record {
     Expression? condition =();
+    FlowType ty = Direct;
+    int ancestorId = 0;
+    readonly int toId;
 };
 
 public type BlockBranchMap record {
     Branch branch;
-    Block block;
+    int blockId;
 };
 
 type SimpleShape record {
     Block inner;
     Shape? next = ();
+    int shapeId;
 };
 
 type MultipleShape record {
     Shape? next = ();
     map<Shape> handledBlocks = {};
+    int shapeId;
 };
 
 type LoopShape record {
     Shape? inner;
     Shape? next;
+    int[] entries = [];
+    int shapeId;
 };
 
 type Shape SimpleShape|MultipleShape|LoopShape;
 
 public class Relooper {
     private Module module;
-    private Branch[] branches =[];
-    private Block[] blocks = [];
+    table<Block> key(id) blocks = table [];
     private int blockId = 1;
-    private Block[] entries =[];
     private Shape? root = ();
     private int shapeId = 1;
 
@@ -46,14 +58,11 @@ public class Relooper {
 
     public function addBranch(Block fromB, Block to, Expression? condition = ()) {
         Branch branch = {
-            condition: condition
+            condition: condition,
+            toId: to.id
         };
-        BlockBranchMap blockBranch = {
-            block: to,
-            branch: branch
-        };
-        fromB.branchesOut.push(blockBranch);
-        to.branchesIn.push(fromB);
+        fromB.branchesOut.add(branch);
+        to.branchesIn.push(fromB.id);
     }
 
     public function addBlock(Expression code) returns Block {
@@ -62,204 +71,411 @@ public class Relooper {
             id: self.blockId
         };
         self.blockId = self.blockId + 1;
-        self.blocks.push(block);
+        self.blocks.add(block);
         return block;
     }
 
-    function checkExistence(Block[]? blocks, int id) returns boolean {
-        if blocks != () {
-            foreach Block b in blocks {
-                if b.id == id {
-                    return true;
+    function createSimpleShape(int[] blocks, int entryId) returns Shape {
+        int[] nextEntries = [];
+        self.shapeId =  self.shapeId + 1;
+        Block? entry = self.blocks[entryId];
+        if entry != () {
+            foreach int nextId in entry.branchesOut.keys() {
+                int? index = blocks.indexOf(nextId);
+                Block? next = self.blocks[nextId];
+                if next != () {
+                    if index != () {
+                        nextEntries.push(nextId);
+                        Branch? branch = entry.branchesOut[nextId];
+                        if branch is Branch {
+                            branch.ty = Br;
+                            branch.ancestorId = self.shapeId;
+                            entry.branchesOut.put(branch);
+                        }
+                    }
+                    next.branchesIn = next.branchesIn.filter(b => b != entryId);
+                    self.blocks.put(next);
                 }
             }
-            return false;
+            self.blocks.put(entry);
+            int[] validBlocks = blocks.filter(b => b != entryId);
+            SimpleShape simple = {
+                inner: entry,
+                next: self.calculate(validBlocks, nextEntries),
+                shapeId: self.shapeId
+            };
+            entry.parent = simple;
+            return simple;
         }
-        return false;
+        panic error("impossible");
     }
 
-    function createSimpleShape(Block[] blocks, Block entry) returns Shape {
-        Block[] nextEntries = [];
-        foreach BlockBranchMap next in entry.branchesOut {
-            if self.checkExistence(blocks, next.block.id) {
-                nextEntries.push(next.block);
-            }
-            next.block.branchesIn = next.block.branchesIn.filter(b => b.id != entry.id);
-        }
-        Block[] validBlocks = blocks.filter(b => b.id != entry.id);
-        SimpleShape simple = {
-            inner: entry,
-            next: self.calculate(validBlocks, nextEntries)
-        };
-        return simple;
-    }
-
-    function createLoopShape(Block[] blocks, Block[] entries) returns Shape {
-        Block[] nextEntries = [];
-        Block[] innerBlocks = entries.clone();
-        Block[] validBlocks = blocks.clone();
-        Block[] queue = entries.clone();
+    function createLoopShape(int[] blocks, int[] entries) returns Shape {
+        int[] nextEntries = [];
+        int[] innerBlocks = entries.clone();
+        int[] validBlocks = blocks.clone();
+        self.shapeId = self.shapeId + 1;
+        int loopShapeId = self.shapeId;
+        int[] queue = entries.clone();
         while queue.length() > 0 {
-            Block curr = queue.remove(0);
-            foreach Block prev in curr.branchesIn {
-                if !self.checkExistence(innerBlocks, prev.id) {
-                    queue.push(prev);
-                    innerBlocks.push(prev);
-                    validBlocks = validBlocks.filter(b => b.id != prev.id);
+            int currId = queue.remove(0);
+            Block? curr = self.blocks[currId];
+            if curr != () {
+                foreach int prev in curr.branchesIn {
+                    if innerBlocks.indexOf(prev) == () {
+                        queue.push(prev);
+                        innerBlocks.push(prev);
+                        validBlocks = validBlocks.filter(b => b != prev);
+                    }
                 }
+                validBlocks = validBlocks.filter(b => b != currId);
             }
-            validBlocks = validBlocks.filter(b => b.id != curr.id);
         }
-        foreach Block entry in entries {
-            entry.branchesIn = entry.branchesIn.filter(b => !self.checkExistence(innerBlocks, b.id));
+        foreach int entryId in entries {
+            Block? entry = self.blocks[entryId];
+            if entry != () {
+                entry.branchesIn = entry.branchesIn.filter(b => innerBlocks.indexOf(b) == ());
+                self.blocks.put(entry);
+            }
         }
-        foreach Block inner in innerBlocks {
-            foreach BlockBranchMap block in inner.branchesOut {
-                if self.checkExistence(validBlocks, block.block.id) {
-                    block.block.branchesIn = block.block.branchesIn.filter(b => !self.checkExistence(innerBlocks, b.id));
-                    nextEntries.push(block.block);
+        foreach int innerId in innerBlocks {
+            Block? inner = self.blocks[innerId];
+            if inner != () {
+                foreach int nextId in inner.branchesOut.keys() {
+                    Block? next = self.blocks[nextId];
+                    if next != () {
+                        if validBlocks.indexOf(nextId) != () {
+                            next.branchesIn = next.branchesIn.filter(b => innerBlocks.indexOf(b) == ());
+                            Branch? branch = inner.branchesOut[nextId];
+                            if branch != () {
+                                branch.ty = Br;
+                                branch.ancestorId = loopShapeId;
+                                inner.branchesOut.put(branch);
+                            }
+                            self.blocks.put(next);
+                            nextEntries.push(nextId);
+                        }
+                        if entries.indexOf(nextId) != () {
+                            Branch? branch = inner.branchesOut[nextId];
+                            if branch != () {
+                                branch.ty = Continue;
+                                branch.ancestorId = loopShapeId;
+                                inner.branchesOut.put(branch);
+                            }
+                        }
+                    }
                 }
+                self.blocks.put(inner);
             }
         }
         LoopShape loop = {
             inner: self.calculate(innerBlocks, entries),
-            next : self.calculate(validBlocks, nextEntries)
+            next : self.calculate(validBlocks, nextEntries),
+            shapeId: loopShapeId
         };
+        loop.entries = entries;
         return loop;
     }
 
-    function invalidateChildren(Block block, map<Block?> ownership, map<Block[]?> independentGroups) {
-        Block[] queue = [block];
+    function invalidateChildren(int block, map<int?> ownership, map<int[]?> independentGroups) {
+        int[] queue = [block];
         while queue.length() > 0 {
-            Block curr = queue.remove(0);
-            Block? owner = ownership[curr.id.toString()];
-            if owner == () {
-                continue;
-            }
-            else {
-                Block[]? ownerGroup = independentGroups[owner.id.toString()];
-                if ownerGroup != () {
-                    ownerGroup = ownerGroup.filter(b => b.id != curr.id);
-                    independentGroups[owner.id.toString()] = ownerGroup;
-                    ownership[curr.id.toString()] = ();
-                    foreach BlockBranchMap child in curr.branchesOut {
-                        queue.push(child.block);
+            int currId = queue.remove(0);
+            Block? curr = self.blocks[currId];
+            if curr != () {
+                int? owner = ownership[currId.toString()];
+                if owner == () {
+                    continue;
+                }
+                else {
+                    int[]? ownerGroup = independentGroups[owner.toString()];
+                    if ownerGroup != () {
+                        ownerGroup = ownerGroup.filter(b => b != currId);
+                        independentGroups[owner.toString()] = ownerGroup;
+                        ownership[currId.toString()] = ();
+                        foreach int childId in curr.branchesOut.keys() {
+                            queue.push(childId);
+                        }
                     }
                 }
             }
         }
     }
 
-    function findIndependentBlocks(Block[] entries) returns map<Block[]> {
-        map<Block[]> independentGroups = {};
-        map<Block?> ownership = {};
-        foreach Block entry in entries {
-            ownership[entry.id.toString()] = entry;
-            independentGroups[entry.id.toString()] = [entry];
+    function findIndependentBlocks(int[] entries) returns map<int[]> {
+        map<int[]> independentGroups = {};
+        map<int?> ownership = {};
+        foreach int entry in entries {
+            ownership[entry.toString()] = entry;
+            independentGroups[entry.toString()] = [entry];
         }
-        Block[] queue = entries.clone();
+        int[] queue = entries.clone();
         while queue.length() > 0 {
-            Block curr = queue.remove(0);
-            Block? owner = ownership[curr.id.toString()];
-            if owner == () {
-                continue;
-            }
-            else {
-                foreach BlockBranchMap child in curr.branchesOut {
-                    int? index = ownership.keys().indexOf(child.block.id.toString());
-                    if index == () {
-                        queue.push(child.block);
-                        ownership[child.block.id.toString()] = owner;
-                        Block[]? group = independentGroups[owner.id.toString()];
-                        if group != () {
-                            group.push(child.block);
-                            independentGroups[owner.id.toString()] = group;
+            int currId = queue.remove(0);
+            Block? curr = self.blocks[currId];
+            if curr != () {
+                int? owner = ownership[currId.toString()];
+                if owner == () {
+                    continue;
+                }
+                else {
+                    foreach int childId in curr.branchesOut.keys() {
+                        int? index = ownership.keys().indexOf(childId.toString());
+                        if index == () {
+                            queue.push(childId);
+                            ownership[childId.toString()] = owner;
+                            int[]? group = independentGroups[owner.toString()];
+                            if group != () {
+                                group.push(childId);
+                                independentGroups[owner.toString()] = group;
+                            }
                         }
-                    }
-                    else {
-                        Block? existingOwner = ownership[child.block.id.toString()];
-                        if existingOwner == () {
-                            continue;
-                        }
-                        else if existingOwner.id != owner.id {
-                            self.invalidateChildren(child.block, ownership, independentGroups);
+                        else {
+                            int? existingOwner = ownership[childId.toString()];
+                            if existingOwner == () {
+                                continue;
+                            }
+                            else if existingOwner != owner {
+                                self.invalidateChildren(childId, ownership, independentGroups);
+                            }
                         }
                     }
                 }
             }
         }
-        foreach Block entry in entries {
-            Block[]? group = independentGroups[entry.id.toString()];
+        foreach int entry in entries {
+            int[]? group = independentGroups[entry.toString()];
             if group != () {
-                foreach Block child in group {
-                    foreach Block parent in child.branchesIn {
-                        if ownership[parent.id.toString()] != ownership[child.id.toString()] {
-                            self.invalidateChildren(child, ownership, independentGroups);
-                            break;
+                foreach int childId in group {
+                    Block? child = self.blocks[childId];
+                    if child != () {
+                        foreach int parent in child.branchesIn {
+                            if ownership[parent.toString()] != ownership[childId.toString()] {
+                                self.invalidateChildren(childId, ownership, independentGroups);
+                                break;
+                            }
                         }
                     }
                 }
             }
         }
-        foreach Block entry in entries {
-            Block[]? group = independentGroups[entry.id.toString()];
+        foreach int entryId in entries {
+            int[]? group = independentGroups[entryId.toString()];
             if group != () {
                 if group.length() == 0 {
-                    _ = independentGroups.remove(entry.id.toString());
+                    _ = independentGroups.remove(entryId.toString());
                 }
             }
             else {
-                _ = independentGroups.remove(entry.id.toString());
+                _ = independentGroups.remove(entryId.toString());
             }
         }
         return independentGroups;
     }
 
-    function createMultipleShape(Block[] blocks, Block[] entries, map<Block[]> independentGroups) returns Shape {
-        Block[] nextEntries = [];
-        Block[] validBlocks = blocks.clone();
-        MultipleShape multiple = {};
-        foreach Block entry in entries {
-            Block[]? group  = independentGroups[entry.id.toString()];
-            if group == () {
-                nextEntries.push(entry);
-            }
-            else {
-                validBlocks = validBlocks.filter(b => b.id != entry.id);
-                foreach Block currInner in group {
-                    validBlocks = validBlocks.filter(b => b.id != currInner.id);
-                    foreach BlockBranchMap child in currInner.branchesOut {
-                        if !self.checkExistence(group, child.block.id) {
-                            Block curr = child.block;
-                            curr.branchesIn = curr.branchesIn.filter(b => !self.checkExistence(group, b.id));
-                            if !self.checkExistence(nextEntries, curr.id) {
-                                nextEntries.push(curr);
-                            }
-                        }
+    function createMultipleShape(int[] blocks, int[] entries, map<int[]> independentGroups) returns Shape {
+        int[] nextEntries = [];
+        int[] validBlocks = blocks.clone();
+        self.shapeId = self.shapeId + 1;
+        MultipleShape multiple = {
+            shapeId: self.shapeId
+        };
+        foreach int entryId in entries {
+            int[]? group  = independentGroups[entryId.toString()];
+            Block? entry = self.blocks[entryId];
+            if entry != () {
+                if group == () {
+                    if nextEntries.indexOf(entryId) == () {
+                        entry.branchesIn = entry.branchesIn.filter(b => entries.indexOf(b) == ());
+                        nextEntries.push(entryId);
                     }
                 }
-                Shape? handledBlock = self.calculate(group, [entry]);
-                if handledBlock != () {
-                    multiple.handledBlocks[entry.id.toString()] = handledBlock;
+                else {
+                    validBlocks = validBlocks.filter(b => b != entryId);
+                    foreach int currInnerId in group {
+                        Block? currInner = self.blocks[currInnerId];
+                        if currInner != () {
+                            validBlocks = validBlocks.filter(b => b != currInnerId);
+                            foreach int childId in currInner.branchesOut.keys() {
+                                if group.indexOf(childId) == () {
+                                    Block? curr = self.blocks[childId];
+                                    if curr != () {
+                                        curr.branchesIn = curr.branchesIn.filter(b => (<int[]>group).indexOf(b) == ());
+                                        if nextEntries.indexOf(childId) == () {
+                                            nextEntries.push(childId);
+                                        }
+                                        Branch? branch = currInner.branchesOut[childId];
+                                        if branch != () {
+                                            branch.ty = Br;
+                                            branch.ancestorId = self.shapeId;
+                                            currInner.branchesOut.put(branch);
+                                        }
+                                        self.blocks.put(curr);
+                                    }
+                                }
+                            }
+                            self.blocks.put(currInner);
+                        }
+                    }
+                    Shape? handledBlock = self.calculate(group, [entryId]);
+                    if handledBlock != () {
+                        multiple.handledBlocks[entry.id.toString()] = handledBlock;
+                    }
                 }
+                self.blocks.put(entry);
             }
         }
         multiple.next = self.calculate(validBlocks, nextEntries);
         return multiple;
     }
 
-    function calculate(Block[] validBlocks, Block[] entries) returns Shape? {
-        if entries.length() == 1 {
-            Block entry = entries[0];
-            if entry.branchesIn.length() == 0 {
-                return self.createSimpleShape(validBlocks,entry);
-            }
-            else {
-                return self.createLoopShape(validBlocks, entries);
+    function getLabel(int|string targetId, string ty) returns string {
+        if ty == "break" {
+            return  "$block$" + targetId.toString() + "$break";
+        }
+        else {
+            return  "$loop$" + targetId.toString() + "$continue";
+        }
+    }
+
+    function renderBranch(Branch branch, Block target, boolean setLabel) returns Expression {
+        WasmBlock block = {};
+        // if setLabel {
+        //     block.name = self.getLabel(target.id, "break");
+        // }
+        if branch.ty == Br {
+            block.body.push(<Break>{ label: self.getLabel(target.id, "break") });
+        }
+        else if branch.ty == Continue {
+            block.body.push(<Break>{ label: self.getLabel(branch.ancestorId, "continue") });
+        }
+        return block;
+    }
+
+    function renderBlock(Block block) returns Expression {
+        WasmBlock ret = {};
+        ret.body.push(block.code);
+        if block.branchesOut.length() == 0 {
+            return ret;
+        }
+        boolean setLabel = true;
+        boolean fused = false;
+        MultipleShape? fusedShape = ();
+        Shape? parent = block.parent;
+        if parent != () {
+            Shape? next = parent.next;
+            if next != () && next is MultipleShape {
+                fused = true;
+                parent.next = next.next;
+                fusedShape = next;
+                if fusedShape != () && fusedShape.handledBlocks.length() == block.branchesOut.length() {
+                    setLabel = false;
+                }
             }
         }
+        Expression? condition = ();
+        WasmBlock ifBody = {};
+        WasmBlock elseBody = {};
+        Expression[] root = [];
+        foreach int outId in block.branchesOut.keys() {
+            boolean isDefault = false;
+            Block? target = self.blocks[outId];
+            Branch? details = block.branchesOut[outId];
+            if target != () && details != () {
+                if details.condition == () {
+                    isDefault = true;
+                }
+                boolean hasFusedContent = false;
+                if fusedShape != () {
+                    hasFusedContent = fused && fusedShape.handledBlocks.hasKey(target.id.toString());
+                }
+                Expression[] currContent = [];
+                if hasFusedContent {
+                    details.ty = Direct;
+                }
+                if setLabel || details.ty != Direct || hasFusedContent {
+                    if details.ty != Direct {
+                        currContent.push(self.renderBranch(details, target, setLabel));
+                    }
+                    if hasFusedContent && fusedShape != () {
+                        Shape? sh = fusedShape.handledBlocks[target.id.toString()];
+                        if sh != () {
+                            Expression[] body = self.renderShape(sh);
+                            foreach Expression expr in body {
+                                currContent.push(expr);
+                            }
+                        }
+                    }
+                }
+                if currContent.length() > 0 {
+                    if isDefault {
+                        if ifBody.body.length() == 0 {
+                            root = currContent;
+                        }
+                        else {
+                            if currContent.length() == 1 {
+                                Expression body = currContent[0];
+                                if body is WasmBlock {
+                                    elseBody = body;
+                                }
+                                else {
+                                    elseBody.body = currContent;
+                                }
+                            }
+                            else {
+                                elseBody.body = currContent;
+                            }
+                        }
+                    }
+                    else {
+                        if currContent.length() == 1 {
+                            Expression body = currContent[0];
+                            if body is WasmBlock {
+                                ifBody = body;
+                            }
+                            else {
+                                ifBody.body = currContent;
+                            }
+                        }
+                        else {
+                            ifBody.body = currContent;
+                        }
+                        condition = details.condition;
+                    }
+                }
+            }
+        }
+        if condition != () {
+            If ifExpr = {
+                ifBody: ifBody,
+                elseBody: elseBody,
+                condition: condition
+            };
+            ret.body.push(ifExpr);
+        }
+        else {
+            foreach Expression expr in root {
+                ret.body.push(expr);
+            }
+        }
+        return ret;
+    }
+
+    function calculate(int[] validBlocks, int[] entries) returns Shape? {
+        if entries.length() == 1 {
+            Block? entry = self.blocks[entries[0]];
+            if entry != () {
+                if entry.branchesIn.length() == 0 {
+                    return self.createSimpleShape(validBlocks, entries[0]);
+                }
+                else {
+                    return self.createLoopShape(validBlocks, entries);
+                }
+            }
+            panic error("impossible");
+        }
         else if entries.length() > 0 {
-            map<Block[]> independentGroups = self.findIndependentBlocks(entries);
+            map<int[]> independentGroups = self.findIndependentBlocks(entries);
             if independentGroups.keys().length() > 0 {
                 return self.createMultipleShape(validBlocks, entries, independentGroups);
             }
@@ -274,182 +490,105 @@ public class Relooper {
         if sh is SimpleShape {
             return self.renderSimpleShape(sh, label);
         }
-        else if sh is MultipleShape {
-            return self.renderMultipleShape(sh);
-        }
-        else {
+        else if sh is LoopShape {
             return self.renderLoopShape(sh);
         }
+        panic error("impossible");
     }
 
-    function renderSimpleShape(SimpleShape simple, string? labelPrev = ()) returns Expression[] {
-        Expression[] children = [];
-        Shape? next = simple.next;
-        WasmBlock innerBlock = {};
-        WasmBlock nextBlock = {};
-        children.push(innerBlock);
-        innerBlock.body.push(simple.inner.code);
-        if next != () {
+    function handleFollowupMultiples(Expression ret, Shape parent) returns Expression {
+        Shape? next = parent.next;
+        if next == () {
+            return ret;
+        }
+        WasmBlock curr = {};
+        if ret is WasmBlock {
+            curr = ret;
+        }
+        else {
+            curr.body.push(ret);
+        }
+
+        while next != () {
             if next is MultipleShape {
-                MultipleShape multiple = next;
-                string label =  "$block$" + self.shapeId.toString() + "$break";
-                self.shapeId += 1;
-                innerBlock.name = label;
-                simple.next = multiple.next;
-                next = multiple.next;
-                Expression? condition = ();
-                WasmBlock? ifBody = ();
-                WasmBlock? elseBody = ();
-                boolean isCond = false;
-                foreach BlockBranchMap blockBranch in simple.inner.branchesOut {
-                    Expression? tempCondition = blockBranch.branch.condition;
-                    if tempCondition != () {
-                        condition = tempCondition;
-                        isCond = true;
-                    }
-                    Shape? handledBlock = multiple.handledBlocks[blockBranch.block.id.toString()];
-                    if isCond && handledBlock != () {
-                        Expression[] ifCode = self.renderShape(handledBlock);
-                        WasmBlock ifBlock = {};
-                        Break br = { label : label };
-                        WasmBlock ifBreakBlock = {
-                            body: [br]
-                        };
-                        if ifCode.length() == 1 {
-                            Expression bodyBlock = ifCode[0];
-                            if bodyBlock is WasmBlock {
-                                foreach Expression expr in bodyBlock.body {
-                                    ifBlock.body.push(expr);
-                                }
-                            }
-                        }
-                        else {
-                            ifBlock.name = label;
-                            foreach Expression expr in ifCode {
-                               ifBlock.body.push(expr);
-                            }
-                        }
-                        ifBlock.body.push(ifBreakBlock);
-                        ifBody = ifBlock;
-                        isCond = false;
-                    }
-                    else {
-                        WasmBlock elseBlock = {};
-                        Break br = { label : label };
-                        if multiple.handledBlocks.length() == 2 && handledBlock != () {
-                            Expression[] elseCode = self.renderShape(handledBlock);
-                            if elseCode.length() == 1 {
-                                Expression bodyBlock = elseCode[0];
-                                if bodyBlock is WasmBlock {
-                                    foreach Expression expr in bodyBlock.body {
-                                        elseBlock.body.push(expr);
-                                    }
-                                }
-                            }
-                            else {
-                                elseBlock.name = label;
-                                foreach Expression expr in elseCode {
-                                    elseBlock.body.push(expr);
-                                }
-                            }
-                            WasmBlock elseBreak = {
-                                body: [br]
-                            };
-                            elseBlock.body.push(elseBreak);
-                        }
-                        else {
-                            elseBlock.body.push(br);
-                        }
-                        elseBody = elseBlock;
-                    }
-                }
-                if condition != () && ifBody != () {
-                    If ifExpr = {
-                        condition : condition,
-                        ifBody : ifBody,
-                        elseBody : elseBody
+                foreach string key in next.handledBlocks.keys() {
+                    curr.name = self.getLabel(key, "break");
+                    WasmBlock outerBlock = {
+                        body: [curr]
                     };
-                    innerBlock.body.push(ifExpr);
+                    Shape? handledShape = next.handledBlocks[key];
+                    if handledShape != () {
+                        Expression[] handledExpr = self.renderShape(handledShape);
+                        foreach Expression expr in handledExpr {
+                            outerBlock.body.push(expr);
+                        }
+                    }
+                    curr = outerBlock;
                 }
+                parent.next = next.next;
+                next = next.next;
             }
             else {
-                Expression? condition = ();
-                WasmBlock? ifBody = ();
-                WasmBlock? elseBody = ();
-                foreach BlockBranchMap item in simple.inner.branchesOut {
-                    if item.branch.condition != () {
-                        condition = item.branch.condition;
-                        string blockName = "$block$" + self.shapeId.toString() + "$break";
-                        self.shapeId = self.shapeId + 1;
-                        innerBlock.name = blockName;
-                        Break br = { label: blockName };
-                        WasmBlock bl = {
-                            body: [br]
-                        };
-                        ifBody = bl;
-                        Break brL = { label: <string>labelPrev };
-                        WasmBlock blL = {
-                            body: [brL]
-                        };
-                        elseBody = blL;
-                    }
+                break;
+            }
+        }
+        if next != () {
+            if next is SimpleShape {
+                curr.name = self.getLabel(next.inner.id, "break");
+            }
+            else if next is LoopShape {
+                if next.entries.length() == 1 {
+                    curr.name = self.getLabel(next.entries[0], "break");
                 }
-                if condition != () && ifBody != () {
-                    If ifExpr = {
-                        condition : condition,
-                        ifBody : ifBody,
-                        elseBody : elseBody
-                    };
-                    innerBlock.body.push(ifExpr);
+                else {
+                    foreach int entryId in next.entries {
+                        curr.name = self.getLabel(entryId, "break");
+                        WasmBlock outerBlock = {
+                            body: [curr]
+                        };
+                        curr = outerBlock;
+                    }
                 }
             }
-            if next != () {
-                Expression[] nextExprs = self.renderShape(next);
-                if nextExprs.length() == 1 {
-                    children.push(nextExprs[0]);
-                }
-                else{
-                    foreach Expression expr in  nextExprs{
-                        nextBlock.body.push(expr);
-                    }
-                    children.push(nextBlock);
-                }
+        }
+        return curr;
+    }
+
+    function renderSimpleShape(SimpleShape simple, string? label = ()) returns Expression[] {
+        Expression[] children = [];
+        Expression ret = self.renderBlock(simple.inner);
+        ret = self.handleFollowupMultiples(ret, simple);
+        children.push(ret);
+        Shape? next = simple.next;
+        if next != () {
+            Expression[] nextExpr = self.renderShape(next);
+            foreach Expression expr in nextExpr {
+                children.push(expr);
             }
         }
         return children;
     }
 
     function renderLoopShape(LoopShape loop) returns Expression[] {
-        Shape? inner = loop.inner;
-        Shape? next = loop.next;
-        Expression[] innerExpr = [];
-        Expression[] nextExpr = [];
         Expression[] children = [];
-        WasmBlock nextBlock = {};
-        string blockName = "$block$" + self.shapeId.toString() + "$break";
-        self.shapeId = self.shapeId + 1;
-        string loopName = "$shape$" + self.shapeId.toString() + "$continue";
-        self.shapeId = self.shapeId + 1;
-        WasmBlock outerBlock = { name : blockName };
-        WasmLoop loopBlock = { name : loopName };
-        outerBlock.body.push(loopBlock);
+        WasmLoop loopBlock = {
+            name: self.getLabel(loop.shapeId, "continue")
+        };
+        Shape? inner = loop.inner;
         if inner != () {
-            innerExpr = self.renderShape(inner, blockName);
-            Break breakLoop = { label: loopName };
-            innerExpr.push(breakLoop);
+            Expression[] innerExpr = self.renderShape(inner);
             loopBlock.loopBody = innerExpr;
         }
-        children.push(outerBlock);
+        Expression ret = self.handleFollowupMultiples(loopBlock, loop);
+        children.push(ret);
+        Shape? next = loop.next;
         if next != () {
-            nextExpr = self.renderShape(next);
-            nextBlock.body = nextExpr;
+            Expression[] nextExpr = self.renderShape(next);
+            foreach Expression expr in nextExpr {
+                children.push(expr);
+            }
         }
-        children.push(nextBlock);
         return children;
-    }
-
-    function renderMultipleShape(MultipleShape multiple) returns Expression[] {
-        panic error("unimplemented");
     }
 
     function makeBlockText(Expression[] result, int spacesCount) returns string {
@@ -515,13 +654,20 @@ public class Relooper {
     }
 
     public function render(Block body, int labelHelper) returns Expression {
-        self.root = self.calculate(self.blocks, [body]);
+        self.root = self.calculate(self.blocks.keys(), [body.id]);
         Expression[] result = [];
         Shape? parent = self.root;
         if parent != () {
             result = self.renderShape(parent);
         }
         return {code: self.makeBlockText(result, 1)};
+    }
+
+    public function reset(){
+        self.blocks = table[];
+        self.blockId = 1;
+        self.root = ();
+        self.shapeId = 1;
     }
 
 }
