@@ -4,7 +4,7 @@ import ballerina/test;
 public function printXOR() returns string[] {
     Module module = new;
     Type[] params = ["i32", "i32"];
-    module.addFunctionImport("println", "console", "log", "i32", "None");
+    module.addFunctionImport("println", "console", "log", ["i32"], "None");
     Expression x = module.localGet(0, "i32");
     Expression y = module.localGet(1, "i32");
     Expression[] thenCallOperands = [module.addConst({ i32: 1 })];

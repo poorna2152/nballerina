@@ -5,7 +5,7 @@ public function whileIf() returns string[] {
     Module module = new;
     Type[] params = ["i32"];
     Type[] localTypes = ["i32", "i32"];
-    module.addFunctionImport("println", "console", "log", "i32", "None");
+    module.addFunctionImport("println", "console", "log", ["i32"], "None");
     Expression x = module.localGet(0, "i32");
     Expression i = module.localGet(1, "i32");
     Expression sum = module.localGet(2, "i32");

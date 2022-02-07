@@ -1,6 +1,6 @@
 public type IntType "i64"|"i32";
 public type Type "None"|IntType;
-public type Op "AddInt32"|"SubInt32"|"MulInt32"|"DivSInt32"|"DivUInt32"|"RemSInt32"|"RemUInt32"|"EqInt32"|"NeInt32"|"LtSInt32"|"LtUInt32"|"LeSInt32"|"LeUInt32"|"GtSInt32"|"GtUInt32"|"GeSInt32"|"GeUInt32"|"OrInt32"|"XorInt32";
+public type Op "AddInt32"|"SubInt32"|"MulInt32"|"DivSInt32"|"DivUInt32"|"RemSInt32"|"RemUInt32"|"EqInt32"|"NeInt32"|"LtSInt32"|"LtUInt32"|"LeSInt32"|"LeUInt32"|"GtSInt32"|"GtUInt32"|"GeSInt32"|"GeUInt32"|"OrInt32"|"XorInt32"|"AddInt64"|"SubInt64"|"MulInt64"|"DivSInt64"|"DivUInt64"|"RemSInt64"|"RemUInt64"|"EqInt64"|"NeInt64"|"LtSInt64"|"LtUInt64"|"LeSInt64"|"LeUInt64"|"GtSInt64"|"GtUInt64"|"GeSInt64"|"GeUInt64"|"OrInt64"|"XorInt64";
 
 final readonly & map<string> signedInt32Ops = {
     "AddInt32": "i32.add",
@@ -14,7 +14,19 @@ final readonly & map<string> signedInt32Ops = {
     "EqInt32": "i32.eq",
     "NeInt32": "i32.ne",
     "OrInt32": "i32.or",
-    "XorInt32": "i32.xor"
+    "XorInt32": "i32.xor",
+    "AddInt64": "i64.add",
+    "SubInt64": "i64.sub",
+    "MulInt64": "i64.mul",
+    "DivSInt64": "i64.div_s",
+    "RemSInt64": "i64.rem_s",
+    "LtSInt64": "i64.lt_s",
+    "LeSInt64": "i64.le_s",
+    "GtSInt64": "i64.gt_s",
+    "EqInt64": "i64.eq",
+    "NeInt64": "i64.ne",
+    "OrInt64": "i64.or",
+    "XorInt64": "i64.xor"
 };
 
 public type Function record {
@@ -155,8 +167,11 @@ public class Module {
         self.functions.push(func);
     }
 
-    public function addFunctionImport(string internalName, string externalModuleName, string externalBaseName, Type params, Type results)  {
-        string[] funcDef = ["(import \"", externalModuleName, "\" \"", externalBaseName, "\" (func $", internalName, " (param ", params, ")"];
+    public function addFunctionImport(string internalName, string externalModuleName, string externalBaseName, Type[] params, Type results)  {
+        string[] funcDef = ["(import \"", externalModuleName, "\" \"", externalBaseName, "\" (func $", internalName];
+        foreach Type ty in params {
+            funcDef.push(" (param ", ty, ")");
+        }
         if results != "None" {
             funcDef.push("(param ");
             funcDef.push(results);

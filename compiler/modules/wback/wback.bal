@@ -1,5 +1,5 @@
 import ballerina/io;
-
+import wso2/nballerina.types as t;
 import wso2/nballerina.err;
 import wso2/nballerina.bir;
 import wso2/nballerina.print.wasm;
@@ -25,17 +25,17 @@ function buildModule(bir:Module mod) returns string[]|BuildError {
         string funcName = functionDefns[i].symbol.identifier;
         wasm:Type[] params = [];
         wasm:Type[] locals = [];
-        // Assuming all params are i32
-        foreach int j in 0..< functionDefns[i].signature.paramTypes.length() {
-            params.push(<wasm:Type> "i32");
+        foreach bir:SemType ty in functionDefns[i].signature.paramTypes {
+            params.push(<wasm:Type>operandType(ty));
         }
-        // Assuming local variables in the function is equal to the number of registers in bir minus number of param types
-        // Assuming all local variables are of type i32
         int numLocalVars = code.registers.length() - functionDefns[i].signature.paramTypes.length();
-        foreach int j in (params.length() - 1)..<numLocalVars {
-            locals.push(<wasm:Type> "i32");
+        foreach int j in params.length()..<numLocalVars {
+            string? ty = operandType(code.registers[j].semType);
+            if ty != () && ty != "None"{
+                locals.push(<wasm:Type>ty);
+            }
         }
-        module.addFunction(funcName, params, "None", locals, 0, body);
+        module.addFunction(funcName, params, <wasm:Type>operandType(functionDefns[i].signature.returnType), locals, locals.length(), body);
         module.addFunctionExport(funcName, funcName);
     }
     return module.finish();
@@ -133,7 +133,7 @@ function buildCondBranch(wasm:Module module, wasm:Relooper relooper, bir:CondBra
     int falseLabel = insn.ifFalse;
     int trueLabel = insn.ifTrue;
     bir:Register operand = insn.operand;
-    relooper.addBranch(blocks[curr], blocks[trueLabel], module.localGet(operand.number, "i32"));
+    relooper.addBranch(blocks[curr], blocks[trueLabel], module.localGet(operand.number, <wasm:Type>operandType(operand.semType)));
     relooper.addBranch(blocks[curr], blocks[falseLabel]);
 }
 
@@ -145,10 +145,10 @@ function buildCall(wasm:Module module, bir:CallInsn insn) returns wasm:Expressio
     wasm:Expression[] args = [];
     foreach var arg in insn.args {
         if arg is bir:Register {
-            args.push(module.localGet(arg.number, "i32"));
+            args.push(module.localGet(arg.number, <wasm:Type>operandType(arg.semType)));
         }
         else if arg is int {
-            args.push(module.addConst({ i32: arg }));
+            args.push(module.addConst({ i64: arg }));
         }
     }
     bir:FunctionOperand ref = insn.func;
@@ -161,11 +161,16 @@ function buildCall(wasm:Module module, bir:CallInsn insn) returns wasm:Expressio
                     symbol: symbol
                 };
                 importedFunctions.add(func);
-                module.addFunctionImport(ref.symbol.identifier, <string>symbol.module.organization, symbol.module.names[0], "i32", "None");
+                wasm:Type[] params = [];
+                foreach bir:SemType ty in ref.signature.paramTypes {
+                    params.push(<wasm:Type>operandType(ty));
+                }
+                module.addFunctionImport(ref.symbol.identifier, <string>symbol.module.organization, symbol.module.names[0], params, <wasm:Type>operandType(ref.signature.returnType));
             }
         }
+        return module.call(ref.symbol.identifier, args, args.length(), <wasm:Type>operandType(ref.signature.returnType));
     }
-    return module.call((<bir:FunctionRef>insn.func).symbol.identifier, args, args.length(), "None");
+    panic error("invalid");
 }
 
 function buildAssign(wasm:Module module, bir:AssignInsn insn) returns wasm:Expression {
@@ -179,33 +184,33 @@ function buildAssign(wasm:Module module, bir:AssignInsn insn) returns wasm:Expre
             return module.localSet(insn.result.number, module.addConst({ i32: op }));
         }
         else if operand is int {
-            return module.localSet(insn.result.number, module.addConst({ i32: operand  }));
+            return module.localSet(insn.result.number, module.addConst({ i64: operand  }));
         }
         panic error("impossible");
     }
     else {
-        return module.localSet(insn.result.number, module.localGet(operand.number, "i32"));
+        return module.localSet(insn.result.number, module.localGet(operand.number, <wasm:Type>operandType(operand.semType)));
     }
 }
 
 function buildIntCompare(wasm:Module module, bir:IntCompareInsn insn) returns wasm:Expression {
-    wasm:Op? operation = signedInt32CompareOps[insn.op];
+    wasm:Op? operation = signedInt64CompareOps[insn.op];
     if operation != () {
         bir:IntOperand op1 = insn.operands[0];
         bir:IntOperand op2 = insn.operands[1];
         wasm:Expression? operand1 = ();
         wasm:Expression? operand2 = ();
         if op1 is bir:Register {
-            operand1 = module.localGet(op1.number, "i32");
+            operand1 = module.localGet(op1.number, <wasm:Type>operandType(op1.semType));
         }
         else {
-            operand1 = module.addConst({ i32: op1 });
+            operand1 = module.addConst({ i64: op1 });
         }
         if op2 is bir:Register {
-            operand2 = module.localGet(op2.number, "i32");
+            operand2 = module.localGet(op2.number, <wasm:Type>operandType(op2.semType));
         }
         else {
-            operand2 = module.addConst({ i32: op2 });
+            operand2 = module.addConst({ i64: op2 });
         }
         if operand1 != () && operand2 != () {
             return module.localSet(insn.result.number, module.binary(operation, operand1, operand2));
@@ -215,23 +220,23 @@ function buildIntCompare(wasm:Module module, bir:IntCompareInsn insn) returns wa
 }
 
 function buildArithmeticBinary(wasm:Module module, bir:IntArithmeticBinaryInsn insn) returns wasm:Expression {
-    wasm:Op? operation = signedInt32ArithmeticOps[insn.op];
+    wasm:Op? operation = signedInt64ArithmeticOps[insn.op];
     if operation != () {
         bir:IntOperand op1 = insn.operands[0];
         bir:IntOperand op2 = insn.operands[1];
         wasm:Expression? operand1 = ();
         wasm:Expression? operand2 = ();
         if op1 is bir:Register {
-            operand1 = module.localGet(op1.number, "i32");
+            operand1 = module.localGet(op1.number, <wasm:Type>operandType(op1.semType));
         }
         else {
-            operand1 = module.addConst({ i32: op1});
+            operand1 = module.addConst({ i64: op1 });
         }
         if op2 is bir:Register {
-            operand2 = module.localGet(op2.number, "i32");
+            operand2 = module.localGet(op2.number, <wasm:Type>operandType(op2.semType));
         }
         else {
-            operand2 = module.addConst({ i32: op2});
+            operand2 = module.addConst({ i64: op2 });
         }
         if operand1 != () && operand2 != () {
             return module.localSet(insn.result.number, module.binary(operation, operand1, operand2));
@@ -240,13 +245,17 @@ function buildArithmeticBinary(wasm:Module module, bir:IntArithmeticBinaryInsn i
     panic error("unimplemented");
 }
 
+// check this
 function buildEqual(wasm:Module module, bir:EqualInsn insn) returns wasm:Expression {
         bir:Operand op1 = insn.operands[0];
         bir:Operand op2 = insn.operands[1];
         wasm:Expression? operand1 = ();
         wasm:Expression? operand2 = ();
+        wasm:Type ty = "i32";
         if op1 is bir:Register {
-            operand1 = module.localGet(op1.number, "i32");
+            wasm:Type op1Type = <wasm:Type>operandType(op1.semType);
+            operand1 = module.localGet(op1.number, op1Type);
+            ty = op1Type;
         }
         else {
             int op = 0;
@@ -256,7 +265,11 @@ function buildEqual(wasm:Module module, bir:EqualInsn insn) returns wasm:Express
             operand1 = module.addConst({ i32: op });
         }
         if op2 is bir:Register {
-            operand2 = module.localGet(op2.number, "i32");
+            wasm:Type op2Type = <wasm:Type>operandType(op2.semType);
+            operand2 = module.localGet(op2.number, op2Type);
+            if op2Type == "i64" {
+                ty = "i64";
+            }
         }
         else {
             int op = 0;
@@ -266,13 +279,24 @@ function buildEqual(wasm:Module module, bir:EqualInsn insn) returns wasm:Express
             operand2 = module.addConst({ i32: op });
         }
         if operand1 != ()  && operand2 != () {
-            return module.binary("EqInt32", operand1, operand2);
+            wasm:Op operation = "EqInt32";
+            if ty == "i64" {
+                operation = "EqInt64";
+            }
+            return module.binary(operation, operand1, operand2);
         }
         panic error("impossible");
 }
 
 function buildIntNegateInsn(wasm:Module module, bir:IntNegateInsn insn) returns wasm:Expression {
-    return module.localSet(insn.result.number, module.binary("MulInt32", module.addConst({ i32: -1 }), module.localGet(insn.operand.number, "i32")));
+    wasm:Type ty = <wasm:Type>operandType(insn.operand.semType);
+    wasm:Op operation = "MulInt32";
+    wasm:Expression constOne = module.addConst({ i32: -1 });
+    if ty == "i64" {
+        operation = "MulInt64";
+        constOne = module.addConst({ i64: -1 });
+    }
+    return module.localSet(insn.result.number, module.binary(operation, constOne,  module.localGet(insn.operand.number, ty)));
 }
 
 function buildBooleanCompare(wasm:Module module, bir:BooleanCompareInsn insn) returns wasm:Expression {
@@ -313,9 +337,21 @@ function buildBooleanCompare(wasm:Module module, bir:BooleanCompareInsn insn) re
 
 function buildBooleanNotInsn(wasm:Module module, bir:BooleanNotInsn insn) returns wasm:Expression {
     int op1 = insn.operand.number;
-    return module.localSet(insn.result.number, module.binary("XorInt32", module.localGet(op1, "i32"), module.addConst({ i32: 0 })));
+    return module.localSet(insn.result.number, module.binary("XorInt32", module.localGet(op1, <wasm:Type>operandType(insn.operand.semType)), module.addConst({ i32: 0 })));
 }
 
+function operandType(bir:SemType operand) returns string? {
+    if operand === t:BOOLEAN {
+        return "i32";
+    }
+    else if operand === t:INT {
+        return "i64";
+    }
+    else if operand === t:NIL {
+        return "None";
+    }
+    return ();
+}
 public function compileModule(bir:Module mod, string? outputFilename) returns err:Any|io:Error? {
     string[] module = check buildModule(mod);
     return io:fileWriteLines("./main.wat", module);
@@ -329,6 +365,14 @@ final readonly & map<wasm:Op> signedInt32ArithmeticOps = {
     "%": "RemSInt32"
 };
 
+final readonly & map<wasm:Op> signedInt64ArithmeticOps = {
+    "+": "AddInt64",
+    "-": "SubInt64",
+    "*": "MulInt64",
+    "/": "DivSInt64",
+    "%": "RemSInt64"
+};
+
 final readonly & map<wasm:Op> signedInt32CompareOps = {
     "<": "LtSInt32",
     "<=": "LeSInt32",
@@ -336,4 +380,13 @@ final readonly & map<wasm:Op> signedInt32CompareOps = {
     ">=": "GeSInt32",
     "==": "EqInt32",
     "!=": "NeInt32"
+};
+
+final readonly & map<wasm:Op> signedInt64CompareOps = {
+    "<": "LtSInt64",
+    "<=": "LeSInt64",
+    ">": "GtSInt64",
+    ">=": "GeSInt64",
+    "==": "EqInt64",
+    "!=": "NeInt64"
 };
