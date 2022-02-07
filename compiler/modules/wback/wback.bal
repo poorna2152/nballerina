@@ -6,6 +6,13 @@ import wso2/nballerina.print.wasm;
 
 type BuildError err:Semantic|err:Unimplemented;
 
+type ImportedFunction record {|
+    readonly bir:ExternalSymbol symbol;
+    bir:FunctionSignature signature;
+|};
+
+table<ImportedFunction> key(symbol) importedFunctions = table[];
+
 function buildModule(bir:Module mod) returns string[]|BuildError {
     bir:FunctionDefn[] functionDefns = mod.getFunctionDefns();
     wasm:Module module = new;
@@ -18,9 +25,12 @@ function buildModule(bir:Module mod) returns string[]|BuildError {
         string funcName = functionDefns[i].symbol.identifier;
         wasm:Type[] params = [];
         wasm:Type[] locals = [];
+        // Assuming all params are i32
         foreach int j in 0..< functionDefns[i].signature.paramTypes.length() {
             params.push(<wasm:Type> "i32");
         }
+        // Assuming local variables in the function is equal to the number of registers in bir minus number of param types
+        // Assuming all local variables are of type i32
         int numLocalVars = code.registers.length() - functionDefns[i].signature.paramTypes.length();
         foreach int j in (params.length() - 1)..<numLocalVars {
             locals.push(<wasm:Type> "i32");
@@ -123,7 +133,7 @@ function buildCondBranch(wasm:Module module, wasm:Relooper relooper, bir:CondBra
     int falseLabel = insn.ifFalse;
     int trueLabel = insn.ifTrue;
     bir:Register operand = insn.operand;
-    relooper.addBranch(blocks[curr], blocks[trueLabel], module.localGet(<int>operand.number, "i32"));
+    relooper.addBranch(blocks[curr], blocks[trueLabel], module.localGet(operand.number, "i32"));
     relooper.addBranch(blocks[curr], blocks[falseLabel]);
 }
 
@@ -145,7 +155,14 @@ function buildCall(wasm:Module module, bir:CallInsn insn) returns wasm:Expressio
     if ref is bir:FunctionRef {
         bir:Symbol symbol = ref.symbol;
         if symbol is bir:ExternalSymbol {
-            module.addFunctionImport(ref.symbol.identifier, <string>symbol.module.organization, symbol.module.names[0], "i32", "None");
+            if !importedFunctions.hasKey(symbol) {
+                ImportedFunction func = {
+                    signature: ref.signature,
+                    symbol: symbol
+                };
+                importedFunctions.add(func);
+                module.addFunctionImport(ref.symbol.identifier, <string>symbol.module.organization, symbol.module.names[0], "i32", "None");
+            }
         }
     }
     return module.call((<bir:FunctionRef>insn.func).symbol.identifier, args, args.length(), "None");
@@ -182,13 +199,13 @@ function buildIntCompare(wasm:Module module, bir:IntCompareInsn insn) returns wa
             operand1 = module.localGet(op1.number, "i32");
         }
         else {
-            operand1 = module.addConst({ i32: op1});
+            operand1 = module.addConst({ i32: op1 });
         }
         if op2 is bir:Register {
             operand2 = module.localGet(op2.number, "i32");
         }
         else {
-            operand2 = module.addConst({ i32: op2});
+            operand2 = module.addConst({ i32: op2 });
         }
         if operand1 != () && operand2 != () {
             return module.localSet(insn.result.number, module.binary(operation, operand1, operand2));
