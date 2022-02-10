@@ -150,6 +150,13 @@ function buildCall(wasm:Module module, bir:CallInsn insn) returns wasm:Expressio
         else if arg is int {
             args.push(module.addConst({ i64: arg }));
         }
+        else if arg is boolean {
+            int op = 0;
+            if arg {
+                op = 1;
+            }
+            args.push(module.addConst({ i32: op }));
+        }
     }
     bir:FunctionOperand ref = insn.func;
     if ref is bir:FunctionRef {
