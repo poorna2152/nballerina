@@ -26,7 +26,7 @@ public function buildModule(bir:Module birMod, *Options options) returns [llvm:M
             DISubprogram diFunc = createFunctionDI(di, partFiles, defn, llFunc, mangledName);
             diFuncs.push(diFunc);
             llFunc.setSubprogram(diFunc);
-        }   
+        }
         if !(options.gcName == ()) {
             llFunc.setGC(options.gcName);
         }
@@ -48,7 +48,7 @@ public function buildModule(bir:Module birMod, *Options options) returns [llvm:M
         functionDefns: llFuncMap,
         stackGuard: llMod.addGlobal(llvm:pointerType("i8"), mangleRuntimeSymbol("stack_guard")),
         llInitTypes: createInitTypes(llContext)
-    };  
+    };
     foreach int i in 0 ..< functionDefns.length() {
         bir:FunctionDefn defn = functionDefns[i];
         bir:FunctionCode code = check birMod.generateFunctionCode(i);

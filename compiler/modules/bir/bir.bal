@@ -66,6 +66,14 @@ public type FunctionRef readonly & record {|
     FunctionSignature signature;
 |};
 
+public type Region record {|
+    Label entry;
+    Label? exit = ();
+    Label? parent = ();
+    boolean isLoop;
+    Label label;
+|};
+
 # A function's code is represented as a factored control flow graph.
 # (as described in Choi et al 1999 https://dl.acm.org/doi/abs/10.1145/381788.316171)
 # This is like a control flow graph, except that basic blocks
@@ -79,6 +87,8 @@ public type FunctionCode record {|
     BasicBlock[] blocks = [];
     # Registers indexed by number
     Register[] registers = [];
+    # Entry and Exit Regions
+    Region[] regions = [];
 |};
 
 # This represents the signature of a function definition.
