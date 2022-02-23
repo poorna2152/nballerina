@@ -116,9 +116,16 @@ public class Module {
         panic error("invalid");
     }
 
-    public function loop(string name, Expression body) returns Expression {
+    public function loop(string name, Expression[]|Expression body) returns Expression {
         string[] inst = ["loop", name];
-        inst.push(...body.tokens);
+        if body is Expression {
+            inst.push(...body.tokens);
+        }
+        else {
+            foreach Expression expr in body {
+                inst.push(...expr.tokens);
+            }
+        }
         return { tokens: appendBraces(inst) };
     }
 
