@@ -73,12 +73,32 @@ function buildFunctionBody(Scaffold scaffold, wasm:Module module, bir:FunctionCo
             if lastInsn is bir:CondBranchInsn {
                 wasm:Expression[] header =  buildBasicBlock(scaffold, module, entry, region.ty);
                 wasm:Expression condition = header.remove(header.length() - 1);
-                wasm:Expression[] ifCode = buildBasicBlock(scaffold, module, code.blocks[lastInsn.ifTrue]);
+                int? ifIndex = checkForEntry(code.regions, lastInsn.ifTrue);
+                wasm:Expression[] ifCode = [];
+                int? elseIndex = checkForEntry(code.regions, lastInsn.ifTrue);
+                if ifIndex != () {
+                    wasm:Expression[]? rendered = renderedRegion[ifIndex.toString()];
+                    if rendered != () {
+                        ifCode.push(...rendered);
+                    }
+                }
+                else {
+                    ifCode = buildBasicBlock(scaffold, module, code.blocks[lastInsn.ifTrue]);
+                }
                 wasm:Expression ifBody = module.block((), ifCode, 2, "None");
                 if ifCode.length() == 1 {
                     ifBody = ifCode[0];
                 }
-                wasm:Expression[] elseCode = buildBasicBlock(scaffold, module, code.blocks[lastInsn.ifFalse]);
+                wasm:Expression[] elseCode = [];
+                if elseIndex != () {
+                    wasm:Expression[]? rendered = renderedRegion[elseIndex.toString()];
+                    if rendered != () {
+                        elseCode.push(...rendered);
+                    }
+                }
+                else {
+                    elseCode = buildBasicBlock(scaffold, module, code.blocks[lastInsn.ifFalse]);
+                }
                 wasm:Expression elseBody = module.block((), elseCode, 2, "None");
                 if ifCode.length() == 1 {
                     elseBody = elseCode[0];
@@ -98,17 +118,17 @@ function buildFunctionBody(Scaffold scaffold, wasm:Module module, bir:FunctionCo
             }
         }
         else if region.ty == "Loop" {
-                wasm:Expression[] loopBody = [];
-                wasm:Expression? loopExit = ();
-                string exitLabel = "";
-                string bodyLabel = "";
+            wasm:Expression[] loopBody = [];
+            wasm:Expression? loopExit = ();
+            string exitLabel = "";
+            string bodyLabel = "";
             string loopLabel = "$block$" + region.entry.toString() + "$break";
             bir:BasicBlock entry = code.blocks[region.entry];
             bir:Insn insn = entry.insns[entry.insns.length() - 1];
-                            if insn is bir:CondBranchInsn {
-                                exitLabel = "$block$" + insn.ifFalse.toString() + "$break";
-                                bodyLabel = "$block$" + insn.ifTrue.toString() + "$break";
-                            }
+            if insn is bir:CondBranchInsn {
+                exitLabel = "$block$" + insn.ifFalse.toString() + "$break";
+                bodyLabel = "$block$" + insn.ifTrue.toString() + "$break";
+            }
             wasm:Expression loopHeader = module.block(bodyLabel, buildBasicBlock(scaffold, module, entry), 2 , "None");
             processedBlocks.push(entry.label);
             if exit != () {
@@ -116,13 +136,13 @@ function buildFunctionBody(Scaffold scaffold, wasm:Module module, bir:FunctionCo
                 if processedBlocks.indexOf(exit) == () {
                     loopExit = module.block((), buildBasicBlock(scaffold, module, code.blocks[exit]), 2 , "None");
                     processedBlocks.push(exit);
-                        }
+                }
                 else if regIndex != () {
                     wasm:Expression[]? renderdExit = renderedRegion[regIndex.toString()];
                     if renderdExit != () {
                         loopExit = module.block((), renderdExit, 2 , "None");
-                        }
-                        }
+                    }
+                }
                 foreach int i in (entry.label + 1)..<exit {
                     int? bodIndex = checkForEntry(code.regions, i);
                     if processedBlocks.indexOf(i) == () {
@@ -133,10 +153,10 @@ function buildFunctionBody(Scaffold scaffold, wasm:Module module, bir:FunctionCo
                         wasm:Expression[]? rendered = renderedRegion[bodIndex.toString()];
                         if rendered != () {
                             loopBody.push(...rendered);
+                        }
                     }
                 }
-                }
-                }
+            }
                 wasm:Expression Lbody = module.block((), loopBody, 2, "None");
                     wasm:Expression loop = module.loop(loopLabel, [loopHeader, Lbody]);
                     wasm:Expression l = module.block(exitLabel, [loop], 1, "None");
