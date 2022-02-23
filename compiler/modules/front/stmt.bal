@@ -97,13 +97,16 @@ class StmtContext {
         return bir:createBasicBlock(self.code, name);
     }
 
-    function createRegion(bir:Label entry, boolean isLoop, bir:Label? parent = (), bir:Label? exit = ()) {
-        bir:Region region  = { label: self.code.regions.length(), entry: entry, isLoop: isLoop, exit: exit };
+    function createRegion(bir:Label entry, bir:RegionType ty, bir:Label? parent = (), bir:Label? exit = ()) {
+        bir:Region region  = { label: self.code.regions.length(), entry: entry, ty: ty, exit: exit };
         boolean found = false;
         foreach bir:Region reg in self.code.regions {
             if reg.entry == region.entry {
                 if reg.exit == () && region.exit != () {
                     reg.exit = region.exit;
+                }
+                if reg.ty != ty {
+                    reg.ty = ty;
                 }
                 found = true;
                 break;
@@ -240,7 +243,7 @@ class StmtContext {
 function codeGenFunction(ModuleSymbols mod, s:FunctionDefn defn, bir:FunctionSignature signature) returns bir:FunctionCode|CodeGenError {
     StmtContext cx = new(mod, defn, signature.returnType);
     bir:BasicBlock startBlock = cx.createBasicBlock();
-    cx.createRegion(startBlock.label, false);
+    cx.createRegion(startBlock.label, "Simple");
     Binding? bindings = ();
     foreach int i in 0 ..< defn.params.length() {
         var param = defn.params[i];
@@ -497,10 +500,10 @@ function codeGenWhileStmt(StmtContext cx, bir:BasicBlock startBlock, Environment
     }
     cx.popLoopContext();
     if exit != () {
-        cx.createRegion(loopHead.label, true, currRegion, exit.label);
+        cx.createRegion(loopHead.label, "Loop", currRegion, exit.label);
     }
     else {
-        cx.createRegion(loopHead.label, true, currRegion);
+        cx.createRegion(loopHead.label, "Loop", currRegion);
     }
     if exitReachable {
         return { block: exit, assignments };
@@ -755,7 +758,7 @@ function codeGenIfElseStmt(StmtContext cx, bir:BasicBlock startBlock, Environmen
         if ifFalse == () {
             // just an if branch
             contBlock = cx.createBasicBlock();
-            cx.createRegion(startBlock.label, false, currRegion, contBlock.label);
+            cx.createRegion(startBlock.label, "Multiple", currRegion, contBlock.label);
             bir:CondBranchInsn condBranch = { operand, ifTrue: ifBlock.label, ifFalse: contBlock.label, pos: stmt.condition.startPos };
             branchBlock.insns.push(condBranch);
             if ifContBlock != () {
@@ -776,7 +779,7 @@ function codeGenIfElseStmt(StmtContext cx, bir:BasicBlock startBlock, Environmen
                 return { block: () };
             }
             contBlock = cx.createBasicBlock();
-            cx.createRegion(startBlock.label, false, currRegion, contBlock.label);
+            cx.createRegion(startBlock.label, "Multiple", currRegion, contBlock.label);
             Position joinPos = (ifFalse is s:StmtBlock ? ifFalse : ifFalse.ifTrue).closeBracePos;
             bir:BranchInsn branch = { dest: contBlock.label, pos: joinPos };
             if ifContBlock != () {

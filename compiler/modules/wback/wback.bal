@@ -53,15 +53,44 @@ function buildFunctionBody(Scaffold scaffold, wasm:Module module, bir:FunctionCo
         bir:Region region = code.regions[index];
         wasm:Expression[] curr = [];
         bir:Label? exit = region.exit;
-        if exit != () {
-            if region.isLoop {
+        if region.ty == "Multiple" {
+            bir:BasicBlock entry = code.blocks[region.entry];
+            bir:Insn lastInsn = entry.insns[entry.insns.length() - 1];
+            if lastInsn is bir:CondBranchInsn {
+                wasm:Expression[] header =  buildBasicBlock(scaffold, module, entry, region.ty);
+                wasm:Expression condition = header.remove(header.length() - 1);
+                wasm:Expression[] ifCode = buildBasicBlock(scaffold, module, code.blocks[lastInsn.ifTrue]);
+                wasm:Expression ifBody = module.block((), ifCode, 2, "None");
+                if ifCode.length() == 1 {
+                    ifBody = ifCode[0];
+                }
+                wasm:Expression[] elseCode = buildBasicBlock(scaffold, module, code.blocks[lastInsn.ifFalse]);
+                wasm:Expression elseBody = module.block((), elseCode, 2, "None");
+                if ifCode.length() == 1 {
+                    elseBody = elseCode[0];
+                }
+                if lastInsn.ifFalse == region.exit {
+                    curr.push(module.addIf(condition, ifBody), elseBody);
+                    curr.push(...header.reverse());
+                }
+                else {
+                    curr.push(module.addIf(condition, ifBody, elseBody));
+                    curr.push(...header.reverse());
+                }
+                processedBlocks.push(entry.label, lastInsn.ifFalse, lastInsn.ifTrue);
+            }
+            else {
+                panic error("last insn of multiple header should be a conditional branch");
+            }
+        }
+        else if region.ty == "Loop" {
                 wasm:Expression[] loopBody = [];
                 wasm:Expression? loopHeader = ();
                 wasm:Expression? loopExit = ();
                 string exitLabel = "";
                 string bodyLabel = "";
                 string loopLabel = "";
-                foreach int j in region.entry...exit {
+            foreach int j in region.entry...<bir:Label>region.exit {
                     if processedBlocks.indexOf(j) == () {
                         if code.blocks[j].loopHead {
                             loopLabel = "$block$" + j.toString() + "$break";
@@ -76,7 +105,7 @@ function buildFunctionBody(Scaffold scaffold, wasm:Module module, bir:FunctionCo
                             loopExit = module.block((), buildBasicBlock(scaffold, module, code.blocks[j]),2 , "None");
                         }
                         else {
-                            loopBody.push(...buildBasicBlock(scaffold, module, code.blocks[j], code.blocks[j].branchBackward));
+                        loopBody.push(...buildBasicBlock(scaffold, module, code.blocks[j], "Loop", code.blocks[j].branchBackward));
                         }
                         processedBlocks.push(j);
                     }
@@ -88,31 +117,27 @@ function buildFunctionBody(Scaffold scaffold, wasm:Module module, bir:FunctionCo
                 curr.push();
                 if loopExit != () {
                     curr.push(loopExit);
+                blocks.push(loopExit);
                 }
-                if loopHeader != () && loopExit != () {
+            if loopHeader != () {
                     wasm:Expression loop = module.loop(loopLabel, [loopHeader, Lbody]);
                     wasm:Expression l = module.block(exitLabel, [loop], 1, "None");
-                    blocks.push(loopExit, l);
+                blocks.push(l);
                 }
             }
             else {
-                foreach int j in region.entry...exit {
-                    if processedBlocks.indexOf(j) == () {
-                        processedBlocks.push(j);
-                        curr.push(...buildBasicBlock(scaffold, module, code.blocks[j]));
+            int last = code.regions.length();
+            if exit != () {
+                last = exit;
                     }
-                }
-            }
-        }
-        else {
-            foreach int j in region.entry..<code.regions.length() {
+            foreach int j in region.entry..<last {
                 if processedBlocks.indexOf(j) == () {
                     processedBlocks.push(j);
                     curr.push(...buildBasicBlock(scaffold, module, code.blocks[j]));
                 }
             }
         }
-        if !region.isLoop {
+        if region.ty != "Loop" {
             blocks.push(...curr);
         }
         index = index - 1;
@@ -120,7 +145,7 @@ function buildFunctionBody(Scaffold scaffold, wasm:Module module, bir:FunctionCo
     return module.block((), blocks.reverse(), blocks.length(), "None");
 }
 
-function buildBasicBlock(Scaffold scaffold, wasm:Module module, bir:BasicBlock block, boolean isBranchBacward = false) returns wasm:Expression[] {
+function buildBasicBlock(Scaffold scaffold, wasm:Module module, bir:BasicBlock block, bir:RegionType? ty = (), boolean isBranchBacward = false) returns wasm:Expression[] {
     wasm:Expression[] body = [];
     foreach var insn in block.insns {
         if insn is bir:IntArithmeticBinaryInsn {
@@ -156,7 +181,7 @@ function buildBasicBlock(Scaffold scaffold, wasm:Module module, bir:BasicBlock b
             }
         }
         else if insn is bir:CondBranchInsn {
-            body.push(buildCondBranch(module, insn));
+            body.push(buildCondBranch(module, insn, ty));
         }
         else {
             continue;
@@ -170,14 +195,15 @@ function buildBranch(wasm:Module module, bir:BranchInsn insn) returns wasm:Expre
     return module.br("$block$" + trueLabel.toString() + "$break");
 }
 
-function buildCondBranch(wasm:Module module, bir:CondBranchInsn insn) returns wasm:Expression {
-    int falseLabel = insn.ifFalse;
-    int trueLabel = insn.ifTrue;
+function buildCondBranch(wasm:Module module, bir:CondBranchInsn insn, bir:RegionType? ty = ()) returns wasm:Expression {
     bir:Register operand = insn.operand;
     wasm:Type? condType = operandType(operand.semType);
-    wasm:Expression ifBr = module.br("$block$" + trueLabel.toString() + "$break");
-    wasm:Expression elseBr = module.br("$block$" + falseLabel.toString() + "$break");
     if condType != () {
+        if ty == "Multiple" {
+            return module.localGet(operand.number, condType);
+        }
+        wasm:Expression ifBr = module.br("$block$" + insn.ifTrue.toString() + "$break");
+        wasm:Expression elseBr = module.br("$block$" + insn.ifFalse.toString() + "$break");
         return module.addIf(module.localGet(operand.number, condType), ifBr, elseBr);
     }
     panic error("impossible");
