@@ -97,8 +97,16 @@ class StmtContext {
         return bir:createBasicBlock(self.code, name);
     }
 
+    function getRegionParent() returns bir:Label {
+        if self.currParent == () {
+            self.currParent = 0;
+        }
+        self.currParent = self.currParent + 1;
+        return <bir:Label>self.currParent - 1;
+    }
+
     function createRegion(bir:Label entry, bir:RegionType ty, bir:Label? parent = (), bir:Label? exit = ()) {
-        bir:Region region  = { label: self.code.regions.length(), entry: entry, ty: ty, exit: exit };
+        bir:Region region  = { entry: entry, ty: ty, exit: exit };
         boolean found = false;
         foreach bir:Region reg in self.code.regions {
             if reg.entry == region.entry {
@@ -118,7 +126,9 @@ class StmtContext {
         else if self.currParent != () {
             region.parent = self.currParent;
         }
-        self.currParent = region.label;
+        if ty != "Loop" {
+            self.currParent = region.parent;
+        }
         if !found {
         self.code.regions.push(region);
         }
@@ -450,8 +460,7 @@ function codeGenForeachStmt(StmtContext cx, bir:BasicBlock startBlock, Environme
 
 function codeGenWhileStmt(StmtContext cx, bir:BasicBlock startBlock, Environment env, s:WhileStmt stmt) returns CodeGenError|StmtEffect {
     bir:BasicBlock loopHead = cx.createBasicBlock(); // where we go to on continue
-    loopHead.loopHead = true;
-    bir:Label? currRegion = cx.currParent;
+    bir:Label? currRegion = cx.getRegionParent();
     bir:BranchInsn branchToLoopHead = { dest: loopHead.label, pos: stmt.body.startPos };
     startBlock.insns.push(branchToLoopHead);
     bir:BasicBlock loopBody = cx.createBasicBlock();
@@ -461,7 +470,6 @@ function codeGenWhileStmt(StmtContext cx, bir:BasicBlock startBlock, Environment
     bir:Insn branch;
     if condition is bir:Register {
         bir:BasicBlock ifFalseBb = cx.createBasicBlock();
-        ifFalseBb.loopExit = true;
         exit = ifFalseBb;
         branch = <bir:CondBranchInsn>{ operand: condition, ifFalse: ifFalseBb.label, ifTrue: loopBody.label, pos: stmt.condition.startPos };
         exitReachable = true;
@@ -473,7 +481,6 @@ function codeGenWhileStmt(StmtContext cx, bir:BasicBlock startBlock, Environment
         // this is `while false { }`
         // need to put something in loopHead
         bir:BasicBlock destBb = cx.createBasicBlock();
-        destBb.loopExit = true;
         exit = destBb;
         branch = <bir:BranchInsn> { dest: destBb.label, pos: stmt.body.closeBracePos };
         exitReachable = true;
@@ -528,6 +535,7 @@ function codeGenBreakContinueStmt(StmtContext cx, bir:BasicBlock startBlock, Env
     bir:Label dest = stmt.breakContinue == "break"? check cx.onBreakLabel(stmt.startPos) : check cx.onContinueLabel(stmt.startPos);
     bir:BranchInsn branch = { dest, pos: stmt.startPos };
     startBlock.insns.push(branch);
+    startBlock.branchBackward = true;
     if stmt.breakContinue == "break" {
         cx.addOnBreakAssignments(env.assignments);
     }
@@ -726,7 +734,7 @@ function maybeCreateBasicBlock(StmtContext cx, bir:BasicBlock? block) returns bi
 
 function codeGenIfElseStmt(StmtContext cx, bir:BasicBlock startBlock, Environment env, s:IfElseStmt stmt) returns CodeGenError|StmtEffect {
     var { condition, ifTrue, ifFalse } = stmt;
-    bir:Label? currRegion = cx.currParent;
+    bir:Label? currRegion = cx.getRegionParent();
     var { result: operand, block: branchBlock, ifTrue: ifCondNarrowings, ifFalse: elseCondNarrowings } = check codeGenExprForCond(cx, startBlock, env, condition);
     if operand is boolean {
         s:StmtBlock|s:IfElseStmt? taken;

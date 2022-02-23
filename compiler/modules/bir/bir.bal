@@ -71,7 +71,6 @@ public type Region record {|
     Label? exit = ();
     Label? parent = ();
     RegionType ty;
-    Label label;
 |};
 
 public enum RegionType {
@@ -124,11 +123,7 @@ public type BasicBlock record {|
     Label? onPanic = ();
     # Backend can use this to generate human-readable label
     string? name = ();
-    # Distinguish loop head
-    boolean loopHead = false;
-    # Distinguish loop exit
-    boolean loopExit = false;
-    # Terminating branch backward
+    # branch to Loop header
     boolean branchBackward = false;
 |};
 
