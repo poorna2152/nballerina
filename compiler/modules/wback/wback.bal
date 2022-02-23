@@ -103,13 +103,24 @@ function buildFunctionBody(Scaffold scaffold, wasm:Module module, bir:FunctionCo
                 if ifCode.length() == 1 {
                     elseBody = elseCode[0];
                 }
+                curr.push(...header);
                 if lastInsn.ifFalse == region.exit {
-                    curr.push(...header);
                     curr.push(module.addIf(condition, ifBody), elseBody);
                 }
                 else {
-                    curr.push(...header);
                     curr.push(module.addIf(condition, ifBody, elseBody));
+                    if exit != () {
+                        int? exitIndex = checkForEntry(code.regions, exit);
+                        if exitIndex != () {
+                            wasm:Expression[]? rendered = renderedRegion[exitIndex.toString()];
+                            if rendered != () {
+                               curr.push(...rendered);
+                            }
+                        }
+                        else {
+                            curr.push(...buildBasicBlock(scaffold, module, code.blocks[exit]));
+                        }
+                    }
                 }
                 processedBlocks.push(entry.label, lastInsn.ifFalse, lastInsn.ifTrue);
             }
@@ -157,9 +168,9 @@ function buildFunctionBody(Scaffold scaffold, wasm:Module module, bir:FunctionCo
                     }
                 }
             }
-                wasm:Expression Lbody = module.block((), loopBody, 2, "None");
-                    wasm:Expression loop = module.loop(loopLabel, [loopHeader, Lbody]);
-                    wasm:Expression l = module.block(exitLabel, [loop], 1, "None");
+            wasm:Expression Lbody = module.block((), loopBody, 2, "None");
+            wasm:Expression loop = module.loop(loopLabel, [loopHeader, Lbody]);
+            wasm:Expression l = module.block(exitLabel, [loop], 1, "None");
             curr.push(l);
             if loopExit != () {
                 curr.push(loopExit);
