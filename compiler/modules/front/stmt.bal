@@ -493,8 +493,8 @@ function codeGenWhileStmt(StmtContext cx, bir:BasicBlock startBlock, Environment
     cx.pushLoopContext(exit, loopHead);
     var { block: loopEnd, assignments } = check codeGenScope(cx, loopBody, env, stmt.body, ifTrue);
     if loopEnd != () {
-        loopEnd.branchBackward = true;
-        loopEnd.insns.push(branchToLoopHead);
+        bir:BranchInsn branchToLoopHeadFromBottom = { dest: loopHead.label, pos: stmt.body.startPos, backward: true };
+        loopEnd.insns.push(branchToLoopHeadFromBottom);
         check validLoopAssignments(cx, assignments);
     }
     check validLoopAssignments(cx, cx.onContinueAssignments());
@@ -533,15 +533,17 @@ function validLoopAssignments(StmtContext cx, Assignment[] assignments) returns 
 
 function codeGenBreakContinueStmt(StmtContext cx, bir:BasicBlock startBlock, Environment env, s:BreakContinueStmt stmt) returns CodeGenError|StmtEffect {
     bir:Label dest = stmt.breakContinue == "break"? check cx.onBreakLabel(stmt.startPos) : check cx.onContinueLabel(stmt.startPos);
-    bir:BranchInsn branch = { dest, pos: stmt.startPos };
-    startBlock.insns.push(branch);
-    startBlock.branchBackward = true;
+    bir:BranchInsn branch = { dest, pos: stmt.startPos, backward: true };
+    // if dest < startBlock.label {
+    //     branch.backward = true;
+    // }
     if stmt.breakContinue == "break" {
         cx.addOnBreakAssignments(env.assignments);
     }
     else {
         cx.addOnContinueAssignments(env.assignments);
     }
+    startBlock.insns.push(branch);
     return { block: () };
 }
 

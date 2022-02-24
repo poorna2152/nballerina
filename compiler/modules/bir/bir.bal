@@ -123,8 +123,6 @@ public type BasicBlock record {|
     Label? onPanic = ();
     # Backend can use this to generate human-readable label
     string? name = ();
-    # branch to Loop header
-    boolean branchBackward = false;
 |};
 
 public type InsnRef readonly & record {|
@@ -661,6 +659,7 @@ public type BranchInsn readonly & record {|
     *InsnBase;
     INSN_BRANCH name = INSN_BRANCH;
     Label dest;
+    boolean backward = false;
 |};
 
 
