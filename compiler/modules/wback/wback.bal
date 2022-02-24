@@ -58,6 +58,30 @@ function checkForEntry(bir:Region[] regions, bir:Label label) returns int? {
     return ();
 }
 
+function checkForBreak(bir:BasicBlock[] blocks, bir:Label entry, bir:Label exit) returns boolean {
+    bir:Label[] queue = [entry + 1];
+    while queue.length() > 0 {
+        bir:BasicBlock curr = blocks[queue.remove(0)];
+        bir:Insn lastInsn = curr.insns[curr.insns.length() - 1];
+        if lastInsn is bir:CondBranchInsn {
+            if lastInsn.ifTrue == exit {
+                return true;
+            }
+            if lastInsn.ifFalse == exit {
+                return true;
+            }
+            queue.push(lastInsn.ifTrue, lastInsn.ifFalse);
+        }
+        else if lastInsn is bir:BranchInsn {
+            bir:Label dest = lastInsn.dest;
+            if dest == exit {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 function buildFunctionBody(Scaffold scaffold, wasm:Module module, bir:FunctionCode code) returns wasm:Expression {
     wasm:Expression[] blocks = [];
     map<wasm:Expression[]> renderedRegion = {};
@@ -75,7 +99,7 @@ function buildFunctionBody(Scaffold scaffold, wasm:Module module, bir:FunctionCo
                 wasm:Expression condition = header.remove(header.length() - 1);
                 int? ifIndex = checkForEntry(code.regions, lastInsn.ifTrue);
                 wasm:Expression[] ifCode = [];
-                int? elseIndex = checkForEntry(code.regions, lastInsn.ifTrue);
+                int? elseIndex = checkForEntry(code.regions, lastInsn.ifFalse);
                 if ifIndex != () {
                     wasm:Expression[]? rendered = renderedRegion[ifIndex.toString()];
                     if rendered != () {
@@ -173,7 +197,12 @@ function buildFunctionBody(Scaffold scaffold, wasm:Module module, bir:FunctionCo
                 l = module.block((), children, 2, "None");
             }
             wasm:Expression loop = module.loop(loopLabel, l);
-            curr.push(loop);
+            if exit != () && checkForBreak(code.blocks, region.entry, exit) {
+                curr.push(module.block("$block$" + exit.toString() + "$break", [loop], 1, "None"));
+            }
+            else {
+                curr.push(loop);
+            }
             if loopExit != () {
                 curr.push(loopExit);
             }

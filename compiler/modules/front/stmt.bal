@@ -784,6 +784,7 @@ function codeGenIfElseStmt(StmtContext cx, bir:BasicBlock startBlock, Environmen
             branchBlock.insns.push(condBranch);
             if ifContBlock == () && elseContBlock == () {
                 // e.g. both arms have a return
+                cx.createRegion(startBlock.label, "Multiple", currRegion);
                 return { block: () };
             }
             contBlock = cx.createBasicBlock();
