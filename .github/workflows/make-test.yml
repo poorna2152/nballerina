@@ -37,6 +37,11 @@ jobs:
           path: |
             ~/binaryen-105.tar.gz
           key: binaryen-${{ runner.os }}
+      - name: Install NodeJS
+        run: |
+          curl -sL https://deb.nodesource.com/setup_17.x -o nodesource_setup.sh
+          sudo bash nodesource_setup.sh
+          sudo apt install nodejs
       - name: Download jBallerina deb
         if: steps.cache-jbal.outputs.cache-hit != 'true' && runner.os == 'Linux'
         run: |
@@ -71,7 +76,7 @@ jobs:
       - name: Test
         run: |
           echo "useing clang=`which clang` llvm-as=`which llvm-as` bal=`which bal`"
-          make test
+          make -j2 test
       - name: Archive test ouput
         if: ${{ failure() }}
         uses: actions/upload-artifact@v2
