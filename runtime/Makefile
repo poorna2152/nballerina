@@ -87,7 +87,7 @@ clean:
 	-rm -f $(OBJS) $(BCS) $(LIB) $(BCLIB)
 	$(MAKE) -C tests clean
 
-.PHONY: test all
+.PHONY: test all testll testall
 # Ensure bogus files get deleted when there's an error
 .DELETE_ON_ERROR:
 
