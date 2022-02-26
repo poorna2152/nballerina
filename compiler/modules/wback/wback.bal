@@ -9,10 +9,8 @@ type BuildError err:Semantic|err:Unimplemented|err:Internal;
 function buildModule(bir:Module mod) returns string[]|BuildError {
     bir:FunctionDefn[] functionDefns = mod.getFunctionDefns();
     wasm:Module module = new;
-    wasm:Relooper relooper = new(module);
     boolean tagAdded = false;
     foreach int i in 0 ..< functionDefns.length() {
-        relooper.reset();
         bir:FunctionCode code = check mod.generateFunctionCode(i);
         check bir:verifyFunctionCode(mod, functionDefns[i], code);
         bir:Region[] sorted = from var e in code.regions

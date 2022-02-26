@@ -43,7 +43,7 @@ public class Module {
         if value is LiteralInt32 {
             return { tokens: appendBraces(["i32.const", value.i32.toString()]) };
         }
-        else {
+        else if value is LiteralInt64 {
             return { tokens: appendBraces(["i64.const", value.i64.toString()]) };
         }
     }
