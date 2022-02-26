@@ -30,7 +30,7 @@ export BCLIB=balrt_inline.bc
 all: $(LIB) $(BCLIB)
 	$(MAKE) -C tests all
 
-test: all
+test testll testwat: all
 	$(MAKE) -C tests test
 
 testCoverage: $(LIB) $(BCLIB)
