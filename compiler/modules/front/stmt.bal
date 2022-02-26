@@ -106,32 +106,11 @@ class StmtContext {
     }
 
     function createRegion(bir:Label entry, bir:RegionType ty, bir:Label? parent = (), bir:Label? exit = ()) {
-        bir:Region region  = { entry: entry, ty: ty, exit: exit };
-        boolean found = false;
-        foreach bir:Region reg in self.code.regions {
-            if reg.entry == region.entry {
-                if reg.exit == () && region.exit != () {
-                    reg.exit = region.exit;
-                }
-                if reg.ty != ty {
-                    reg.ty = ty;
-                }
-                found = true;
-                break;
-            }
-        }
-        if parent != () {
-            region.parent = parent;
-        }
-        else if self.currParent != () {
-            region.parent = self.currParent;
-        }
+        bir:Region region  = { entry: entry, ty: ty, exit: exit, parent: parent };
         if ty != "Loop" {
             self.currParent = region.parent;
         }
-        if !found {
         self.code.regions.push(region);
-        }
     }
 
     function qNameRange(Position startPos) returns Range {
@@ -253,7 +232,6 @@ class StmtContext {
 function codeGenFunction(ModuleSymbols mod, s:FunctionDefn defn, bir:FunctionSignature signature) returns bir:FunctionCode|CodeGenError {
     StmtContext cx = new(mod, defn, signature.returnType);
     bir:BasicBlock startBlock = cx.createBasicBlock();
-    cx.createRegion(startBlock.label, "Simple");
     Binding? bindings = ();
     foreach int i in 0 ..< defn.params.length() {
         var param = defn.params[i];
@@ -262,8 +240,12 @@ function codeGenFunction(ModuleSymbols mod, s:FunctionDefn defn, bir:FunctionSig
     }
     var { block: endBlock } = check codeGenScope(cx, startBlock, { bindings }, defn.body);
     if endBlock != () {
+        cx.createRegion(startBlock.label, "Simple", (), endBlock.label);
         bir:RetInsn ret = { operand: bir:NIL_OPERAND, pos: defn.body.closeBracePos };
         endBlock.insns.push(ret);
+    }
+    else {
+        cx.createRegion(startBlock.label, "Simple", ());
     }
     codeGenOnPanic(cx, defn.body.closeBracePos);
     return cx.code;
@@ -324,9 +306,6 @@ function codeGenScope(StmtContext cx, bir:BasicBlock bb, Environment initialEnv,
             narrowings = combineNarrowings(narrowings, effect.narrowings, intersectNarrowing);
         }
     }
-    // if cx.code.regions[cx.code.regions.length() - 1].exit == () {
-    //     cx.code.regions[cx.code.regions.length() - 1].exit = (<bir:BasicBlock>curBlock).label;
-    // }
     check unusedLocalVariables(cx, env, initialEnv.bindings);
     Assignment[] assignments = [];
     addAssignments(assignments, env.assignments, startRegister);
@@ -736,7 +715,6 @@ function maybeCreateBasicBlock(StmtContext cx, bir:BasicBlock? block) returns bi
 
 function codeGenIfElseStmt(StmtContext cx, bir:BasicBlock startBlock, Environment env, s:IfElseStmt stmt) returns CodeGenError|StmtEffect {
     var { condition, ifTrue, ifFalse } = stmt;
-    bir:Label? currRegion = cx.getRegionParent();
     var { result: operand, block: branchBlock, ifTrue: ifCondNarrowings, ifFalse: elseCondNarrowings } = check codeGenExprForCond(cx, startBlock, env, condition);
     if operand is boolean {
         s:StmtBlock|s:IfElseStmt? taken;
@@ -762,6 +740,7 @@ function codeGenIfElseStmt(StmtContext cx, bir:BasicBlock startBlock, Environmen
         }
     }
     else {
+        bir:Label? currRegion = cx.getRegionParent();
         bir:BasicBlock ifBlock = cx.createBasicBlock();
         var { block: ifContBlock, assignments, narrowings: ifNarrowings } = check codeGenScope(cx, ifBlock, env, ifTrue, ifCondNarrowings);
         bir:BasicBlock contBlock;

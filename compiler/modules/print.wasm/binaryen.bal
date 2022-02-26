@@ -116,28 +116,29 @@ public class Module {
         panic error("invalid");
     }
 
-    public function loop(string name, Expression[]|Expression body) returns Expression {
+    public function loop(string name, Expression body) returns Expression {
         string[] inst = ["loop", name];
-        if body is Expression {
-            inst.push(...body.tokens);
-        }
-        else {
-            foreach Expression expr in body {
-                inst.push(...expr.tokens);
-            }
-        }
+        inst.push(...body.tokens);
         return { tokens: appendBraces(inst) };
     }
 
     public function block(string? name, Expression[] children, int numChildren, Type? ty = "None") returns Expression {
-        string[] inst = ["block"];
+        string[] inst = [];
+        boolean containBlock = false;
+        if children.length() > 1 || name != () {
+            inst = ["block"];
+            containBlock = true;
+        }
         if name != () {
             inst.push(name);
         }
         foreach Expression child in children {
             inst.push(...child.tokens);
         }
-        return { tokens: appendBraces(inst) };
+        if containBlock {
+            inst = appendBraces(inst);
+        }
+        return { tokens: inst };
     }
 
     public function addIf(Expression condition, Expression ifTrue, Expression? ifFalse = ()) returns Expression {
