@@ -44,7 +44,7 @@ public class Module {
             return { tokens: appendBraces(["i32.const", value.i32.toString()]) };
         }
         else {
-            return { tokens: appendBraces(["i64.const", value.i64.toString()]) };
+            return { tokens: appendBraces(["i64.const", (<LiteralInt64>value).i64.toString()]) };
         }
     }
 
