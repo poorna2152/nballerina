@@ -41,6 +41,8 @@ jobs:
         if: steps.cache-binaryen.outputs.cache-hit != 'true' && runner.os == 'Linux'
         run: |
           curl -L "https://github.com/WebAssembly/binaryen/releases/download/version_105/binaryen-version_105-x86_64-linux.tar.gz" > $HOME/binaryen-105.tar.gz
+      - name: Extract Binaryen tools deb
+        run: |
           tar -xf $HOME/binaryen-105.tar.gz -C $HOME/
       - name: Install NodeJS Linux
         if: runner.os == 'Linux'
@@ -78,6 +80,9 @@ jobs:
         if: steps.cache-jbal.outputs.cache-hit != 'true' && runner.os == 'macOs'
         run: |
           curl -L "https://github.com/WebAssembly/binaryen/releases/download/version_105/binaryen-version_105-x86_64-macos.tar.gz" > $HOME/binaryen-105.tar.gz
+          tar -xf $HOME/binaryen-105.tar.gz -C $HOME/
+      - name: Extract Binaryen Tools macOs
+        run: |
           tar -xf $HOME/binaryen-105.tar.gz -C $HOME/
       - name: Test
         run: |
