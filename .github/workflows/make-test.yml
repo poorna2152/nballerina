@@ -37,6 +37,19 @@ jobs:
           path: |
             ~/binaryen-105.tar.gz
           key: binaryen-${{ runner.os }}
+      - name: Download Binaryen tools deb
+        if: steps.cache-binaryen.outputs.cache-hit != 'true' && runner.os == 'Linux'
+        run: |
+          curl -L "https://github.com/WebAssembly/binaryen/releases/download/version_105/binaryen-version_105-x86_64-linux.tar.gz" > $HOME/binaryen-105.tar.gz
+      - name: Extract Binaryen tools deb
+        if: runner.os == 'Linux'
+        run: |
+          tar -xf $HOME/binaryen-105.tar.gz
+          ls $HOME/
+      - name: List Home
+        if: runner.os == 'Linux'
+        run: |
+          ls $HOME/
       - name: Install NodeJS Linux
         if: runner.os == 'Linux'
         run: |
@@ -58,15 +71,6 @@ jobs:
           sudo dpkg -i $HOME/ballerina-$JBAL_VERSION-swan-lake-linux-x64.deb
           echo "/usr/lib/ballerina/bin" >> $GITHUB_PATH
           echo "/usr/lib/ballerina/dependencies/jdk-11.0.8+10-jre/bin/java" >> $GITHUB_PATH
-      - name: Download Binaryen tools deb
-        if: steps.cache-binaryen.outputs.cache-hit != 'true' && runner.os == 'Linux'
-        run: |
-          curl -L "https://github.com/WebAssembly/binaryen/releases/download/version_105/binaryen-version_105-x86_64-linux.tar.gz" > $HOME/binaryen-105.tar.gz
-          tar -xf $HOME/binaryen-105.tar.gz
-      - name: List Home
-        if: runner.os == 'Linux'
-        run: |
-          ls $HOME/
       - name: Download jBallerina pkg
         if: steps.cache-jbal.outputs.cache-hit != 'true' && runner.os == 'macOs'
         run: |
