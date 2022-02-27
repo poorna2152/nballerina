@@ -53,7 +53,7 @@ jobs:
       - name: Install NodeJS Linux
         if: runner.os == 'Linux'
         run: |
-          curl -sL https://deb.nodesource.com/setup_17.x -o nodesource_setup.sh
+          curl -sL https://deb.nodesource.com/setup_17.5.0 -o nodesource_setup.sh
           sudo bash nodesource_setup.sh
           sudo apt install nodejs
           node -v
