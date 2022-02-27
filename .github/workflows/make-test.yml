@@ -53,9 +53,8 @@ jobs:
       - name: Install NodeJS Linux
         if: runner.os == 'Linux'
         run: |
-          curl -sL https://deb.nodesource.com/setup_17.x -o nodesource_setup.sh
-          sudo bash nodesource_setup.sh
-          sudo apt install nodejs
+          curl -fsSL https://deb.nodesource.com/setup_17.x | sudo -E bash -
+          sudo apt-get install -y nodejs
           node -v
       - name: Install NodeJS macOs
         if: runner.os == 'macOs'
