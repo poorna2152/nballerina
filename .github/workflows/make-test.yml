@@ -44,7 +44,7 @@ jobs:
       - name: Extract Binaryen tools deb
         if: runner.os == 'Linux'
         run: |
-          tar -xf $HOME/binaryen-105.tar.gz
+          tar -xf binaryen-105.tar.gz -C $HOME/
           ls $HOME/
       - name: List Home
         if: runner.os == 'Linux'
