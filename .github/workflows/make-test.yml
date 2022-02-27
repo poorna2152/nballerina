@@ -37,7 +37,8 @@ jobs:
           path: |
             ~/binaryen-105.tar.gz
           key: binaryen-${{ runner.os }}
-      - name: Install NodeJS
+      - name: Install NodeJS Linux
+        if: runner.os == 'Linux'
         run: |
           curl -sL https://deb.nodesource.com/setup_17.x -o nodesource_setup.sh
           sudo bash nodesource_setup.sh
