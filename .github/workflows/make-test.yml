@@ -98,7 +98,7 @@ jobs:
         with:
           name: test output
           path: |
-            test/out
+            test/outwat
 
   test-jni:
     env:
