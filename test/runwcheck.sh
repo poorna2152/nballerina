@@ -18,7 +18,7 @@ if test $kind == p; then
     $("./$1" >/dev/null 2>"$out")
     head -n 2 $out | sed -e 's/.*bal:/'"$balFile"':/' | diff -u "$2" -
 else
-    node ../../../runtime/js/main.js $1 --import > "$out"
+    node ../../../runtime/js/main.js $1 --import --experimental-wasm-eh > "$out"
     diff -u "$2" "$out"
 fi
 
