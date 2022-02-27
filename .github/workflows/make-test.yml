@@ -63,7 +63,7 @@ jobs:
         run: |
           curl -L "https://github.com/WebAssembly/binaryen/releases/download/version_105/binaryen-version_105-x86_64-linux.tar.gz" > $HOME/binaryen-105.tar.gz
           tar -xf $HOME/binaryen-105.tar.gz
-          ls
+          ls $HOME/
       - name: Download jBallerina pkg
         if: steps.cache-jbal.outputs.cache-hit != 'true' && runner.os == 'macOs'
         run: |
@@ -80,9 +80,7 @@ jobs:
         run: |
           curl -L "https://github.com/WebAssembly/binaryen/releases/download/version_105/binaryen-version_105-x86_64-macos.tar.gz" > $HOME/binaryen-105.tar.gz
           tar -xf $HOME/binaryen-105.tar.gz 
-          ls $HOME/binaryen-version_105
           ls $HOME/
-          ls $HOME/binaryen-version_105/bin
       - name: Test
         run: |
           echo "useing clang=`which clang` llvm-as=`which llvm-as` bal=`which bal`"
