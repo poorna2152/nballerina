@@ -86,7 +86,7 @@ jobs:
         if: steps.cache-jbal.outputs.cache-hit != 'true' && runner.os == 'macOs'
         run: |
           curl -L "https://github.com/WebAssembly/binaryen/releases/download/version_105/binaryen-version_105-x86_64-macos.tar.gz" > $HOME/binaryen-105.tar.gz
-          tar -xf $HOME/binaryen-105.tar.gz 
+          tar -xf $HOME/binaryen-105.tar.gz -C $HOME/
           ls $HOME/
       - name: Test
         run: |
