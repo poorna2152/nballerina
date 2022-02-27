@@ -13,7 +13,7 @@ COMPILER_JAR=../../../build/bin/nballerina.jar
 JAVA ?= $(shell ../../findJava.sh)
 bal_files = $(wildcard ../../../compiler/testSuite/$(tdir)/*-[vpo].bal)
 # These are usd in phase 3
-BINARYEN = $(HOME)/binaryen-version_105/bin/wasm-opt
+BINARYEN = $(shell ../../findBinaryen.sh)
 wat_files = $(wildcard wat/*.wat)
 test_cases = $(basename $(notdir $(bal_files)))
 expect_files = $(addsuffix .txt, $(addprefix expect/, $(test_cases)))
