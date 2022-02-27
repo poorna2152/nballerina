@@ -43,6 +43,11 @@ jobs:
           curl -sL https://deb.nodesource.com/setup_17.x -o nodesource_setup.sh
           sudo bash nodesource_setup.sh
           sudo apt install nodejs
+      - name: Install NodeJS macOs
+        if: runner.os == 'macOs'
+        run: |
+          curl "https://nodejs.org/dist/latest/node-${VERSION:-$(wget -qO- https://nodejs.org/dist/latest/ | sed -nE 's|.*>node-(.*)\.pkg</a>.*|\1|p')}.pkg" > "$HOME/Downloads/node-latest.pkg" && sudo installer -store -pkg "$HOME/Downloads/node-latest.pkg" -target "/"
+          pkgin -y install nodejs
       - name: Download jBallerina deb
         if: steps.cache-jbal.outputs.cache-hit != 'true' && runner.os == 'Linux'
         run: |
@@ -58,6 +63,7 @@ jobs:
         run: |
           curl -L "https://github.com/WebAssembly/binaryen/releases/download/version_105/binaryen-version_105-x86_64-linux.tar.gz" > $HOME/binaryen-105.tar.gz
           tar -xf $HOME/binaryen-105.tar.gz
+          ls 
       - name: Download jBallerina pkg
         if: steps.cache-jbal.outputs.cache-hit != 'true' && runner.os == 'macOs'
         run: |
@@ -74,10 +80,13 @@ jobs:
         run: |
           curl -L "https://github.com/WebAssembly/binaryen/releases/download/version_105/binaryen-version_105-x86_64-macos.tar.gz" > $HOME/binaryen-105.tar.gz
           tar -xf $HOME/binaryen-105.tar.gz 
+          ls $HOME/binaryen-version_105
+          ls $HOME/
+          ls $HOME/binaryen-version_105/bin
       - name: Test
         run: |
           echo "useing clang=`which clang` llvm-as=`which llvm-as` bal=`which bal`"
-          make test
+          make testwat
       - name: Archive test ouput
         if: ${{ failure() }}
         uses: actions/upload-artifact@v2
