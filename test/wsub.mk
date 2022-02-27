@@ -73,4 +73,4 @@ clean:
 .SECONDEXPANSION:
 $(wasm_files):
 	@echo $@
-	$(BINARYEN) -O3 wat/$(addsuffix .wat, $(basename $(notdir $@))) -o $@ -all
+	$(BINARYEN) -O3 wat/$(addsuffix .wat, $(basename $(notdir $@))) -o $@ -all --experimental-wasm-eh
