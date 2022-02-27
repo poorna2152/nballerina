@@ -41,15 +41,7 @@ jobs:
         if: steps.cache-binaryen.outputs.cache-hit != 'true' && runner.os == 'Linux'
         run: |
           curl -L "https://github.com/WebAssembly/binaryen/releases/download/version_105/binaryen-version_105-x86_64-linux.tar.gz" > $HOME/binaryen-105.tar.gz
-      - name: Extract Binaryen tools deb
-        if: runner.os == 'Linux'
-        run: |
           tar -xf $HOME/binaryen-105.tar.gz -C $HOME/
-          ls $HOME/
-      - name: List Home
-        if: runner.os == 'Linux'
-        run: |
-          ls $HOME/
       - name: Install NodeJS Linux
         if: runner.os == 'Linux'
         run: |
@@ -87,11 +79,10 @@ jobs:
         run: |
           curl -L "https://github.com/WebAssembly/binaryen/releases/download/version_105/binaryen-version_105-x86_64-macos.tar.gz" > $HOME/binaryen-105.tar.gz
           tar -xf $HOME/binaryen-105.tar.gz -C $HOME/
-          ls $HOME/
       - name: Test
         run: |
           echo "useing clang=`which clang` llvm-as=`which llvm-as` bal=`which bal`"
-          make testwat
+          make -j2 test
       - name: Archive test ouput
         if: ${{ failure() }}
         uses: actions/upload-artifact@v2
@@ -99,6 +90,7 @@ jobs:
           name: test output
           path: |
             test/outwat
+            test/outll
 
   test-jni:
     env:
