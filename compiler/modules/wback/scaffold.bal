@@ -97,7 +97,7 @@ class Scaffold {
             length: val.toBytes().length()
         };
         self.context.segments[val] = <StringRecord>rec; 
-        self.context.offset = val.toBytes().length();
+        self.context.offset += val.toBytes().length();
         return (<StringRecord>rec).global.toString();
     }
 
@@ -112,8 +112,10 @@ final Repr REPR_BOOLEAN = { base: BASE_REPR_BOOLEAN, wasm: WASM_BOOLEAN };
 final TaggedRepr REPR_STRING = { base: BASE_REPR_TAGGED, wasm: "eqref", subtype: t:STRING };
 final TaggedRepr REPR_NIL = { base: BASE_REPR_TAGGED, wasm: "eqref", subtype: t:NIL };
 final TaggedRepr REPR_ANY = { base: BASE_REPR_TAGGED, wasm: "eqref" , subtype: t:ANY };
-final TaggedRepr REPR_LIST_RW = { base: BASE_REPR_TAGGED, subtype: t:LIST_RW, wasm: { base: "List", initial: "null" } };
-final TaggedRepr REPR_LIST = { base: BASE_REPR_TAGGED, subtype: t:LIST, wasm: { base: "List", initial: "null" } };
+final TaggedRepr REPR_LIST_RW = { base: BASE_REPR_TAGGED, subtype: t:LIST_RW, wasm: { base: LIST_TYPE, initial: "null" } };
+final TaggedRepr REPR_LIST = { base: BASE_REPR_TAGGED, subtype: t:LIST, wasm: { base: LIST_TYPE, initial: "null" } };
+final TaggedRepr REPR_MAPPING_RW = { base: BASE_REPR_TAGGED, subtype: t:MAPPING_RW, wasm: { base: MAP_TYPE, initial: "null" } };
+final TaggedRepr REPR_MAPPING = { base: BASE_REPR_TAGGED, subtype: t:MAPPING_RW, wasm: { base: MAP_TYPE, initial: "null" } };
 final VoidRepr REPR_VOID = { base: BASE_REPR_VOID, wasm: WASM_VOID };
 
 final readonly & record {|
@@ -127,7 +129,9 @@ final readonly & record {|
     { domain: t:TOP, repr: REPR_ANY },
     { domain: t:LIST_RW, repr: REPR_LIST_RW },
     { domain: t:LIST, repr: REPR_LIST },
-    { domain: t:STRING, repr: REPR_STRING }
+    { domain: t:STRING, repr: REPR_STRING },
+    { domain: t:MAPPING, repr: REPR_MAPPING },
+    { domain: t:MAPPING_RW, repr: REPR_MAPPING }
 ];
 
 function semTypeRetRepr(t:SemType ty) returns RetRepr {

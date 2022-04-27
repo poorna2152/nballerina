@@ -382,6 +382,23 @@ public class Module {
         return { tokens: appendBraces(inst) };
     }
 
+    public function tableSet(string name, Expression index, Expression value) returns Expression {
+        Token[] inst = ["table.set", "$" + name];
+        inst.push(...index.tokens);
+        inst.push(...value.tokens);
+        return { tokens: appendBraces(inst) };
+    }
+
+    public function tableGet(string name, Expression index) returns Expression {
+        Token[] inst = ["table.get", "$" + name];
+        inst.push(...index.tokens);
+        return { tokens: appendBraces(inst) };
+    }
+
+    public function addTable(string 'table, int initial, Type tableType) returns Expression {
+        return { tokens: appendBraces(["table", "$" + 'table, initial.toString(), getTypeString(tableType)]) };
+    }
+
     public function finish() returns string[] {
         Token[] module = [joinTokens(["(", "module"], 0)];
         Expression[][] orderedSections = [self.types, self.memory, self.data, self.imports, self.tags, self.globals, self.tagExports, self.exports];

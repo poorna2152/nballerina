@@ -29,3 +29,34 @@ function buildListSet(wasm:Module module, Scaffold scaffold, bir:ListSetInsn ins
     wasm:Expression newMember = buildRepr(module, scaffold, insn.operands[2], REPR_ANY);
     return module.call("arr_set", [list, newMember, index], "None");
 }
+
+function buildMappingConstruct(wasm:Module module, Scaffold scaffold, bir:MappingConstructInsn insn) returns wasm:Expression {
+    string[] fieldNames = insn.fieldNames;
+    bir:Operand[] operands = insn.operands;
+    wasm:Expression[] children = [];
+    children.push(module.localSet(insn.result.number, module.structNew(MAP_TYPE, [module.call("map_create", [], "anyref")])));
+    foreach int i in 0..<fieldNames.length() {
+        wasm:Expression convertedToData = module.refAs("ref.as_data", module.localGet(insn.result.number));
+        wasm:Expression cast = module.refCast(convertedToData, module.rtt(MAP_TYPE));
+        wasm:Expression convertedToDataString = module.refAs("ref.as_data", buildConstString(module, scaffold, fieldNames[i]));
+        wasm:Expression castString = module.refCast(convertedToDataString, module.rtt(STRING_TYPE));
+        children.push(module.call("map_set", [module.structGet(MAP_TYPE, "val", cast), module.structGet(STRING_TYPE, "val", castString), buildRepr(module, scaffold, operands[i], REPR_ANY)], "None"));
+    }
+    return module.block(children);
+}
+
+
+function buildMappingGet(wasm:Module module, Scaffold scaffold, bir:MappingGetInsn insn) returns wasm:Expression {
+    bir:Register m = insn.operands[0];
+    wasm:Expression key = module.structGet(STRING_TYPE, "val", buildString(module, scaffold, insn.operands[1]));
+    return module.localSet(insn.result.number, module.call("map_get", [module.structGet(MAP_TYPE, "val", module.localGet(m.number)), key], "anyref"));
+}
+
+function buildMappingSet(wasm:Module module, Scaffold scaffold, bir:MappingSetInsn insn) returns wasm:Expression {
+    bir:Register m = insn.operands[0];
+    wasm:Expression convertedToDataString = module.refAs("ref.as_data", buildString(module, scaffold, insn.operands[1]));
+    wasm:Expression castString = module.refCast(convertedToDataString, module.rtt(STRING_TYPE));
+    wasm:Expression key = module.structGet(STRING_TYPE, "val", castString);
+    wasm:Expression val = buildRepr(module, scaffold, insn.operands[2], REPR_ANY);
+    return module.call("map_set", [module.structGet(MAP_TYPE, "val", module.localGet(m.number)), key, val], "anyref");
+}

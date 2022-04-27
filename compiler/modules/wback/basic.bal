@@ -29,6 +29,15 @@ function buildBasicBlock(Scaffold scaffold, wasm:Module module, bir:BasicBlock b
         else if insn is bir:AssignInsn {
             body.push(buildAssign(module, scaffold, insn));
         }
+        else if insn is bir:MappingConstructInsn {
+            body.push(buildMappingConstruct(module, scaffold, insn));
+        }
+        else if insn is bir:MappingGetInsn {
+            body.push(buildMappingGet(module, scaffold, insn));
+        }
+        else if insn is bir:MappingSetInsn {
+            body.push(buildMappingSet(module, scaffold, insn));
+        }
         else if insn is bir:ListConstructInsn {
             body.push(buildListConstruct(module, scaffold, insn));
         }

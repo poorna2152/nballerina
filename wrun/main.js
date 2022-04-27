@@ -6,13 +6,27 @@ let untagBoolean = null;
 let len = null;
 let strLen = null;
 let arrayGet = null;
+let getCharAt = null;
 let getTypeChildren = null;
 let getObject = null;
+let getMap = null;
 let mem = null;
 const COMPARE_LT = 0;
 const COMPARE_LE = 1;
 const COMPARE_GT = 2;
 const COMPARE_GE = 3;
+const create_string = (offset, length) => {
+  let surrogate = []
+  var bytes = new Uint8Array(mem.buffer, offset, length);
+  var string = new TextDecoder('utf8').decode(bytes);
+  surrogate = string.match(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g) || [];
+  return {
+    value: string,
+    surrogate: surrogate
+  };
+} 
+const string = String.prototype;
+string.create = create_string;
 if (process.argv.length > 2) {
   let fileName = process.argv[2];
   const wasmBuffer = fs.readFileSync(fileName);
@@ -59,6 +73,20 @@ if (process.argv.length > 2) {
           }
           return result;
         }
+      },
+      map : {
+        create: function() {
+          return create_map();
+        },
+        set: function(m, key, val) { 
+          set_map(m, key, val);
+        },
+        get: function(m, key) {
+          return get_map(m, key);
+        },
+        length: function(m) {
+          return BigInt(m.keys().length)
+        }
       }
     };
     WebAssembly.instantiate(wasmBuffer, importObject).then(obj => {
@@ -79,6 +107,8 @@ if (process.argv.length > 2) {
       arrayGet = obj.instance.exports.arr_get;
       strLen = obj.instance.exports.str_arr_length;
       getObject = obj.instance.exports.get_string;
+      getMap = obj.instance.exports.get_map;
+      getCharAt = obj.instance.exports.get_char_at;
       mem = obj.instance.exports.memory;
       obj.instance.exports.main();
     }).catch((err) => {
@@ -100,6 +130,7 @@ if (process.argv.length > 2) {
 
 const getValue = (ref, parent = null) => {
   let type = getType(ref);
+  console.log(type)
   if (parent !== null) {
     type = getTypeChildren(parent, ref);
   }
@@ -121,10 +152,14 @@ const getValue = (ref, parent = null) => {
     for (let index = 0; index < length; index++) {
       let element = arrayGet(ref, index);
       let val = getValue(element, ref);
+      let ty = getType(element);
       if (val === "") {
         val = "null"
       }
-      output += JSON.stringify(val) + ",";
+      if (ty == 5) {
+        val = JSON.stringify(val)
+      }
+      output += val + ",";
     }
     if (output.indexOf(",") != -1) {
       output = output.substring(0, output.length - 1)
@@ -137,6 +172,36 @@ const getValue = (ref, parent = null) => {
   }
   else if (type == 5) {
     return getObject(ref).value;
+  }
+  else if (type == 6) {
+    m = getMap(ref);
+    let map = "{"
+    m.forEach((value, key) => {
+      val = getValue(value, ref);
+      map += `"${key}":${val == "" ? "null" : val},`
+    });
+    if (map.indexOf(",") != -1) {
+      map = map.substring(0, map.length - 1)
+    }
+    map += "}"
+    return map;
+  }
+}
+
+const create_map = () => {
+  return new Map();
+}
+
+const set_map = (map, key, val) => {
+  map.set(key.value, val);
+}
+
+const get_map = (map, key) => {
+  if (map.has(key.value)) {
+    return map.get(key.value);
+  }
+  else {
+    return null;
   }
 }
 
@@ -168,14 +233,3 @@ const errorHandler = err => {
   }
   console.log(msg)
 }
-
-const create_string = (offset, length) => {
-  let surrogate = []
-  var bytes = new Uint8Array(mem.buffer, offset, length);
-  var string = new TextDecoder('utf8').decode(bytes);
-  surrogate = string.match(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g) || [];
-  return {
-    value: string,
-    surrogate: surrogate
-  };
-} 

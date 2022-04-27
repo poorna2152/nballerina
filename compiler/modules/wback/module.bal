@@ -81,6 +81,10 @@ function buildModule(bir:Module mod) returns string[]|BuildError {
     module.addFunctionImport("str_concat", "string", "concat", ["anyref", "anyref"], "anyref");
     module.addFunctionImport("str_eq", "string", "eq", ["anyref", "anyref"], "i32");
     module.addFunctionImport("str_comp", "string", "comp", ["i32", "anyref", "anyref"], "i32");
+    module.addFunctionImport("map_create", "map", "create", [], "anyref");
+    module.addFunctionImport("map_set", "map", "set", ["anyref", "anyref", "anyref"], "None");
+    module.addFunctionImport("map_get", "map", "get", ["anyref", "anyref"], "eqref");
+    module.addFunctionImport("map_length", "map", "length", ["anyref"], "i64");
     addRttFunctions(module);
     return module.finish();
 }
@@ -105,13 +109,13 @@ function addRttFunctions(wasm:Module module) {
     addFuncArraySet(module);
     addFuncArrayGrow(module);
     addFuncGetTypeChildren(module);
-    addFuncGetStrLength(module);
     addFuncGetString(module);
-    module.addType("List", module.struct(["arr", "len"], [{ base: "AnyList" }, "i64"], [true, true]));
-    module.addType("AnyList", module.array("eqref"));
-    module.addType("chars", module.array("i32"));
+    addFuncGetMap(module);
+    module.addType(LIST_TYPE, module.struct(["arr", "len"], [{ base: "AnyList" }, "i64"], [true, true]));
+    module.addType(ANY_ARR_TYPE, module.array("eqref"));
     module.addType(BOXED_INT_TYPE, module.struct(["val"], ["i64"], [true]));
-    module.addType("String", module.struct(["val"], ["anyref"], [true]));
+    module.addType(STRING_TYPE, module.struct(["val"], ["anyref"], [true]));
+    module.addType(MAP_TYPE, module.struct(["val"], ["anyref"], [true]));
     module.addTag(INDEX_OUT_0F_BOUND_TAG);
     module.addTagExport(INDEX_OUT_0F_BOUND_TAG,INDEX_OUT_0F_BOUND_TAG);
     module.addTag(INDEX_TOO_LARGE_TAG);
