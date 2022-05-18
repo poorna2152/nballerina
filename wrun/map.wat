@@ -275,7 +275,7 @@
               (i32.const 1))))
         (if
           (i32.ge_u
-            (local.get $5)
+            (local.get $4)
             (local.get $6))
           (block
             (struct.set $Map $tableLengthShift

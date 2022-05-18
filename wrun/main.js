@@ -191,7 +191,7 @@ const hash_string = (str) => {
   var hash = 5381,
   i    = str.length;
   while(i) {
-    hash = (hash * 33) ^ str.charCodeAt(--i);
+    hash = (hash * 33) ^ (2654435761 * str.charCodeAt(--i));
   }
   return hash >>> 0;
 }
