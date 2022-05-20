@@ -694,6 +694,7 @@ function codeGenMatchStmt(StmtContext cx, bir:BasicBlock startBlock, Environment
     BindingChain?[] clauseBindings = [];
     clauseBindings[stmt.clauses.length() - 1] = ();
     bir:RegionIndex?[] openedRegions = [regionIndex];
+    int skipRegionIndex = defaultClauseIndex != () ? defaultClauseIndex : stmt.clauses.length();   
     if binding != () {
         // Match expression is a variable
         // We get one type narrowing per clause (which combines all the patterns in the clause)
@@ -709,10 +710,7 @@ function codeGenMatchStmt(StmtContext cx, bir:BasicBlock startBlock, Environment
             bir:NarrowRegister ifFalseRegister = cx.createNarrowRegister(clauseUnmatchedLooksLike[i], binding.reg, pos);
             bir:BasicBlock nextBlock;
             nextBlock = cx.createBasicBlock("gard." + i.toString());
-            if defaultClauseIndex != () && i + 1 != defaultClauseIndex {
-                openedRegions.push(cx.openRegion(nextBlock.label, bir:REGION_COND));
-            }
-            else if defaultClauseIndex == () && i + 1 != stmt.clauses.length() {
+            if i + 1 != skipRegionIndex {
                 openedRegions.push(cx.openRegion(nextBlock.label, bir:REGION_COND));
             }
             bir:TypeBranchInsn typeBranch = {
@@ -753,10 +751,7 @@ function codeGenMatchStmt(StmtContext cx, bir:BasicBlock startBlock, Environment
             }
             bir:BasicBlock nextBlock = cx.createBasicBlock("pattern." + patternIndex.toString());
             patternIndex += 1;
-            if defaultClauseIndex != () && patternIndex != defaultClauseIndex {
-                openedRegions.push(cx.openRegion(nextBlock.label, bir:REGION_COND));
-            }
-            else if defaultClauseIndex == () && patternIndex != stmt.clauses.length() {
+            if patternIndex != skipRegionIndex {
                 openedRegions.push(cx.openRegion(nextBlock.label, bir:REGION_COND));
             }
             bir:CondBranchInsn condBranch = { operand: testResult, ifTrue: clauseBlocks[clauseIndex].label, ifFalse: nextBlock.label, pos: mt.pos } ;
